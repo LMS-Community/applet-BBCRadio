@@ -38,6 +38,8 @@ local hasDecode, decode= pcall(require, "squeezeplay.decode")
 local appletManager    = appletManager
 local jnt              = jnt
 
+local JIVE_VERSION     = jive.JIVE_VERSION
+
 
 module(..., Framework.constants)
 oo.class(_M, Applet)
@@ -658,17 +660,35 @@ function _playstream(self, playback, data, decode, host, port, codec, outputthre
 								 local ip = dns:toip(host)
 								 if ip then
 									 log:info("playing stream codec ", codec, " host: ", host, " ip: ", ip, " port: ", port)
-									 decode:start(string.byte(codec),
-												  string.byte(data.transitionType),
-												  data.transitionPeriod,
-												  data.replayGain,
-												  outputthresh or data.outputThreshold,
-												  data.flags & 0x03,
-												  samplesize or string.byte(data.pcmSampleSize),
-												  samplerate or string.byte(data.pcmSampleRate),
-												  string.byte(data.pcmChannels),
-												  string.byte(data.pcmEndianness)
-											  )
+									 local v1, v2, v3, v4 = string.match(JIVE_VERSION, "(%d+)%.(%d+)%.(%d+)%sr(%d+)")
+									 if v1 == 7 and v2 == 5 then
+										 -- 7.5
+										 decode:start(string.byte(codec),
+													  string.byte(data.transitionType),
+													  data.transitionPeriod,
+													  data.replayGain,
+													  outputthresh or data.outputThreshold,
+													  data.flags & 0x03,
+													  samplesize or string.byte(data.pcmSampleSize),
+													  samplerate or string.byte(data.pcmSampleRate),
+													  string.byte(data.pcmChannels),
+													  string.byte(data.pcmEndianness)
+												  )
+									 else
+										 -- 7.6 and later - additional channels parameter
+										 decode:start(string.byte(codec),
+													  string.byte(data.transitionType),
+													  data.transitionPeriod,
+													  data.replayGain,
+													  outputthresh or data.outputThreshold,
+													  data.flags & 0x03,
+													  data.flags & 0xC,
+													  samplesize or string.byte(data.pcmSampleSize),
+													  samplerate or string.byte(data.pcmSampleRate),
+													  string.byte(data.pcmChannels),
+													  string.byte(data.pcmEndianness)
+												  )
+									 end
 									 playback:_streamConnect(ip, port)
 
 									 local type
