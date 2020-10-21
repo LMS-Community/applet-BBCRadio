@@ -131,10 +131,18 @@ local localradio = {
 	{ text = "BBC York",          id = "bbc_radio_york"      },
 }
 
+local tzoffset
 
-local tzoffset = os.time(os.date("*t")) - os.time(os.date("!*t"))
+function setTzOffset()
+	local t1 = os.date("*t")
+	local t2 = os.date("!*t")
+	t1.isdst = false
+	tzoffset = os.time(t1) - os.time(t2)
+	log:debug("tzoffset: ", tzoffset)
+end
 
 local function str2timeZ(timestr)
+	-- return time since epoch for timestr, nb assumes constant tzoffset which is inaccurate across dst changes
 	local year, mon, mday, hour, min, sec = string.match(timestr, "(%d+)-(%d+)-(%d+)T(%d+):(%d+):(%d+)Z")
 	return os.time({ hour = hour, min = min, sec = sec, year = year, month = mon, day = mday }) + tzoffset
 end
@@ -145,6 +153,9 @@ local _menuAction
 function menu(self, menuItem)
 	local window = Window("text_list", menuItem.text)
 	local menu   = SimpleMenu("menu")
+
+	-- set the tzoffset on each use in case of dst changes
+	setTzOffset()
 
 	-- listen live menus
 	menu:addItem({

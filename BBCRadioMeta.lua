@@ -64,7 +64,7 @@ function notify_playerCurrent(self, player)
 		log:debug("local player selected - adding to menu")
 		jiveMain:addItemToNode(self.menu, 'radios')
 	else
-		log:debug("local player not selected - removing from meny")
+		log:debug("local player not selected - removing from menu")
 		jiveMain:removeItemFromNode(self.menu, 'radios')
 	end
 end
