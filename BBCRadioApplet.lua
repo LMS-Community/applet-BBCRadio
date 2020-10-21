@@ -25,7 +25,7 @@ local SocketTcp        = require("jive.net.SocketTcp")
 local Framework        = require("jive.ui.Framework")
 local Window           = require("jive.ui.Window")
 local SimpleMenu       = require("jive.ui.SimpleMenu")
-local Checkbox         = require("jive.ui.Checkbox")
+local Choice           = require("jive.ui.Choice")
 local Task             = require("jive.ui.Task")
 local Timer            = require("jive.ui.Timer")
 local Player           = require("jive.slim.Player")
@@ -219,17 +219,17 @@ function menu(self, menuItem)
 		})
 	end
 
-	-- add setting for wma vs rtmp streams
 	menu:addItem({
-		text = "WMA streams",
+		text  = "Streams:",
 		style = 'item_choice',
-		check = Checkbox("checkbox",
-			function(object, isSelected)
-				self:getSettings()["usewma"] = isSelected
-				self:storeSettings()
-			end,
-			self:getSettings()["usewma"]
-		),
+		check = Choice("choice", 
+					   { "WMA", "Flash AAC/MP3" },
+					   function(object, isSelected)
+						   self:getSettings()["usewma"] = (isSelected == 1)
+						   self:storeSettings()
+					   end,
+					   self:getSettings()["usewma"] and 1 or 2
+		)
 	})
 
 	window:addWidget(menu)
@@ -497,7 +497,8 @@ end
 -- return itterator of preferred service names
 function _preferredServices(self)
 	local order = {
-		'iplayer_uk_stream_aac_rtmp_live',      -- start here if not usewma
+		'iplayer_uk_stream_aac_rtmp_hi_live',    -- start here if not usewma
+		'iplayer_uk_stream_aac_rtmp_live',
 		'iplayer_uk_stream_aac_rtmp_concrete',
 		'iplayer_intl_stream_aac_rtmp_live',
 		'iplayer_intl_stream_aac_rtmp_concrete',
@@ -513,7 +514,7 @@ function _preferredServices(self)
 		'iplayer_intl_stream_wma_uk_concrete',
 		'iplayer_intl_stream_wma_lo_concrete'
 	}
-	local i = self:getSettings()["usewma"] and 9 or 0
+	local i = self:getSettings()["usewma"] and 10 or 0
 	return function()
 			   i = i + 1
 			   return order[i]
