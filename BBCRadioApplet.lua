@@ -20,6 +20,7 @@ local Applet           = require("jive.Applet")
 
 local RequestHttp      = require("jive.net.RequestHttp")
 local SocketHttp       = require("jive.net.SocketHttp")
+local SocketTcp        = require("jive.net.SocketTcp")
 
 local Framework        = require("jive.ui.Framework")
 local Window           = require("jive.ui.Window")
@@ -41,27 +42,28 @@ oo.class(_M, Applet)
 local live_prefix = "http://www.bbc.co.uk/mediaselector/4/mtis/stream/"
 local la_prefix   = "http://www.bbc.co.uk/radio/aod/availability/"
 local img_prefix  = "http://www.bbc.co.uk/iplayer/img/"
-local img_templ   = "http://node1.bbcimg.co.uk/iplayer/images/episode/%s_512_288.jpg";
+local img_templ   = "http://node1.bbcimg.co.uk/iplayer/images/episode/%s_512_288.jpg"
+local lt_prefix   = "pubsub.livetext."
 
 local live = {
-	{ text = "BBC Radio 1",       id = "bbc_radio_one",     img = "radio/bbc_radio_one.gif"    },
-	{ text = "BBC Radio 1Xtra",   id = "bbc_1xtra",         img = "radio/bbc_radio_two.gif"    },
-	{ text = "BBC Radio 2",       id = "bbc_radio_two",     img = "radio/bbc_radio_two.gif"    },
-	{ text = "BBC Radio 3",       id = "bbc_radio_three",   img = "radio/bbc_radio_three.gif"  },
-	{ text = "BBC Radio 4 FM",    id = "bbc_radio_fourfm",  img = "radio/bbc_radio_four.gif"   },
-	{ text = "BBC Radio 4 LW",    id = "bbc_radio_fourlw",  img = "radio/bbc_radio_four.gif"   },
-	{ text = "BBC Radio 5 Live",  id = "bbc_radio_five_live", img = "radio/bbc_radio_five_live.gif" },
-	{ text = "BBC Radio 5 Sports",id = "bbc_radio_five_live_sports_extra", img = "radio/bbc_radio_five_live_sports_extra.gif" },
-	{ text = "BBC Radio 6 Music", id = "bbc_6music",        img = "radio/bbc_6music.gif"       },
-	{ text = "BBC Radio 7",       id = "bbc_7",             img = "radio/bbc_7.gif"            },
-	{ text = "BBC Asian Network", id = "bbc_asian_network", img = "radio/bbc_asian_network.gif" },
-	{ text = "BBC World Service", id = "bbc_world_service", img = "radio/bbc_world_service.gif" },
-	{ text = "BBC Radio Scotland",id = "bbc_radio_scotland",img = "radio/bbc_radio_scotland_1.gif" },
-	{ text = "BBC Radio nan Gaidheal", id = "bbc_radio_nan_gaidheal", img = "radio/bbc_radio_nan_gaidheal.gif" },
-	{ text = "BBC Radio Ulster",  id = "bbc_radio_ulster",  img = "radio/bbc_radio_ulster.gif" },
-	{ text = "BBC Radio Foyle",   id = "bbc_radio_foyle",   img = "station_logos/bbc_radio_foyle.png" },
-	{ text = "BBC Radio Wales",   id = "bbc_radio_wales",   img = "radio/bbc_radio_wales.gif" },
-	{ text = "BBC Radio Cymru",   id = "bbc_radio_cymru",   img = "radio/bbc_radio_cymru.gif" },
+	{ text = "BBC Radio 1",       id = "bbc_radio_one",     img = "radio/bbc_radio_one.gif",     lt = "radio1"  },
+	{ text = "BBC Radio 1Xtra",   id = "bbc_1xtra",         img = "radio/bbc_radio_two.gif",     lt = "1xtra"   },
+	{ text = "BBC Radio 2",       id = "bbc_radio_two",     img = "radio/bbc_radio_two.gif",     lt = "radio2"  },
+	{ text = "BBC Radio 3",       id = "bbc_radio_three",   img = "radio/bbc_radio_three.gif",   lt = "radio3"  },
+	{ text = "BBC Radio 4 FM",    id = "bbc_radio_fourfm",  img = "radio/bbc_radio_four.gif",    lt = "radio4"  },
+	{ text = "BBC Radio 4 LW",    id = "bbc_radio_fourlw",  img = "radio/bbc_radio_four.gif"                    },
+	{ text = "BBC Radio 5 Live",  id = "bbc_radio_five_live", img = "radio/bbc_radio_five_live.gif", lt = "radio5live" },
+	{ text = "BBC Radio 5 Sports",id = "bbc_radio_five_live_sports_extra", img = "radio/bbc_radio_five_live_sports_extra.gif", lt = "sportsextra" },
+	{ text = "BBC Radio 6 Music", id = "bbc_6music",        img = "radio/bbc_6music.gif",        lt = "6music"  },
+	{ text = "BBC Radio 7",       id = "bbc_7",             img = "radio/bbc_7.gif",             lt = "bbc7"    },
+	{ text = "BBC Asian Network", id = "bbc_asian_network", img = "radio/bbc_asian_network.gif", lt = "asiannetwork" },
+	{ text = "BBC World Service", id = "bbc_world_service", img = "radio/bbc_world_service.gif", lt = "worldservice" },
+	{ text = "BBC Radio Scotland",id = "bbc_radio_scotland",img = "radio/bbc_radio_scotland_1.gif", lt = "radioscotland" },
+	{ text = "BBC Radio nan Gaidheal", id = "bbc_radio_nan_gaidheal", img = "radio/bbc_radio_nan_gaidheal.gif"  },
+	{ text = "BBC Radio Ulster",  id = "bbc_radio_ulster",  img = "radio/bbc_radio_ulster.gif"                  },
+	{ text = "BBC Radio Foyle",   id = "bbc_radio_foyle",   img = "station_logos/bbc_radio_foyle.png"           },
+	{ text = "BBC Radio Wales",   id = "bbc_radio_wales",   img = "radio/bbc_radio_wales.gif"                   },
+	{ text = "BBC Radio Cymru",   id = "bbc_radio_cymru",   img = "radio/bbc_radio_cymru.gif"                   },
 }
 
 local listenagain = {
@@ -99,31 +101,31 @@ local localradio = {
 	{ text = "BBC Humberside",    id = "bbc_radio_humberside" },
 	{ text = "BBC Jersey",        id = "bbc_radio_jersey"    },
 	{ text = "BBC Kent",          id = "bbc_radio_kent"      },
-	{ text = "BBC Lancashire",    id = "bbc_radio_lancashire" },
-	{ text = "BBC Leeds",         id = "bbc_radio_leeds" },
+	{ text = "BBC Lancashire",    id = "bbc_radio_lancashire"},
+	{ text = "BBC Leeds",         id = "bbc_radio_leeds"     },
 	{ text = "BBC Leicester",     id = "bbc_radio_leicester" },
 	{ text = "BBC Lincolnshire",  id = "bbc_radio_lincolnshire" },
 	{ text = "BBC London",        id = "bbc_london"          },
-	{ text = "BBC Manchester",    id = "bbc_radio_manchester" },
-	{ text = "BBC Merseyside",    id = "bbc_radio_merseyside" },
+	{ text = "BBC Manchester",    id = "bbc_radio_manchester"},
+	{ text = "BBC Merseyside",    id = "bbc_radio_merseyside"},
 	{ text = "BBC Newcastle",     id = "bbc_radio_newcastle" },
 	{ text = "BBC Norfolk",       id = "bbc_radio_norfolk"   },
 	{ text = "BBC Northampton",   id = "bbc_radio_northampton" },
-	{ text = "BBC Nottingham",    id = "bbc_radio_nottingham" },
-	{ text = "BBC Oxford",        id = "bbc_radio_oxford"     },
-	{ text = "BBC Sheffield",     id = "bbc_radio_sheffield"  },
-	{ text = "BBC Shropshire",    id = "bbc_radio_shropshire" },
-	{ text = "BBC Solent",        id = "bbc_radio_solent"     },
+	{ text = "BBC Nottingham",    id = "bbc_radio_nottingham"},
+	{ text = "BBC Oxford",        id = "bbc_radio_oxford"    },
+	{ text = "BBC Sheffield",     id = "bbc_radio_sheffield" },
+	{ text = "BBC Shropshire",    id = "bbc_radio_shropshire"},
+	{ text = "BBC Solent",        id = "bbc_radio_solent"    },
 	{ text = "BBC Somerset",      id = "bbc_radio_somerset_sound" },
-	{ text = "BBC Stoke",         id = "bbc_radio_stoke"      },
-	{ text = "BBC Suffolk",       id = "bbc_radio_suffolk"    },
-	{ text = "BBC Surrey",        id = "bbc_radio_surrey"     },
-	{ text = "BBC Sussex",        id = "bbc_radio_sussex"     },
-	{ text = "BBC Tees",          id = "bbc_tees"             },
+	{ text = "BBC Stoke",         id = "bbc_radio_stoke"     },
+	{ text = "BBC Suffolk",       id = "bbc_radio_suffolk"   },
+	{ text = "BBC Surrey",        id = "bbc_radio_surrey"    },
+	{ text = "BBC Sussex",        id = "bbc_radio_sussex"    },
+	{ text = "BBC Tees",          id = "bbc_tees"            },
 	{ text = "BBC Three Counties",id = "bbc_three_counties_radio" },
-	{ text = "BBC Wiltshire",     id = "bbc_radio_wiltshire"  },
-	{ text = "BBC WM",            id = "bbc_wm"               },
-	{ text = "BBC York",          id = "bbc_radio_york"       },
+	{ text = "BBC Wiltshire",     id = "bbc_radio_wiltshire" },
+	{ text = "BBC WM",            id = "bbc_wm"              },
+	{ text = "BBC York",          id = "bbc_radio_york"      },
 }
 
 
@@ -152,7 +154,9 @@ function menu(self, menuItem)
 					isPlayableItem = 1,
 					style = 'item_choice',
 					callback = function()
-						self:_play({ url = live_prefix .. entry.id, title = entry.text, img = img_prefix .. entry.img })
+						self:_play({ url = live_prefix .. entry.id, title = entry.text, img = img_prefix .. entry.img, 
+									 livetxt = entry.lt and ( lt_prefix .. entry.lt ) or nil
+								 })
 						appletManager:callService('goNowPlaying', Window.transitionPushLeft, false)
 					end,
 				})
@@ -332,6 +336,9 @@ function _play(self, stream)
 	if stream.dur then
 		url = url .. "&dur=" .. mime.b64(stream.dur)
 	end
+	if stream.livetxt then
+		url = url .. "&livetxt=" .. mime.b64(stream.livetxt)
+	end
 	log:info("sending request to ", server, " player ", player, " url ", url)
 	server:userRequest(nil,	player:getId(), { "playlist", "play", url, stream.title })
 end
@@ -351,6 +358,12 @@ function bbcmsparser(self, playback, data, decode)
 	if data.start then
 		data.start = mime.unb64("", data.start)
 		log:info("start: ", data.start)
+	end
+
+	data.livetxt = string.match(cmdstr, "livetxt%=(.-)%&")
+	if data.livetxt then
+		data.livetxt = mime.unb64("", data.livetxt)
+		log:info("livetxt: ", data.livetxt)
 	end
 	
 	local req = RequestHttp(_sinkMSParser(self, playback, data, decode), 'GET', url, {})
@@ -590,10 +603,113 @@ function _playstream(self, playback, data, decode, host, port, codec, outputthre
 												  string.byte(data.pcmEndianness)
 											  )
 									 playback:_streamConnect(ip, port)
+
+									 local type
+									 if     codec == 'a' then type = 'aac'
+									 elseif codec == 'm' then type = 'mp3'
+									 elseif codec == 'w' then type = 'wma'
+									 end
+									 
+									 playback.slimproto:send({ opcode = "META", data = "type=" .. mime.b64(type) .. "&" })
+									 
+									 if data.livetxt then
+										 self:_livetxt(data.livetxt, playback)
+									 end
+
 								 else
 									 log:warn("bad dns lookup for ", entry["server"])
 								 end
 							 end
-	):addTask()
+	 ):addTask()
 end
 
+
+local livetxtsock
+
+function _livetxt(self, node, playback)
+	log:info("opening live text connection for: ", node)
+
+	-- make sure we only have one connection to the server open at one time
+	if livetxtsock then
+		livetxtsock:t_removeRead()
+		livetxtsock:close()
+	end
+
+	local ip = "push.bbc.co.uk"
+	local port = 5222
+	local username = ""
+	for i = 0, 20 do
+		username = username .. math.random(10)
+	end
+
+	local request =
+		"<stream:stream to='push.bbc.co.uk' xml:lang='en' xmlns='jabber:client' xmlns:stream='http://etherx.jabber.org/streams'>" ..
+		"<iq id='auth' type='set' xmlns='jabber:client'><query xmlns='jabber:iq:auth'><password />" .. "<username>" .. username .. "</username><resource>pubsub</resource></query></iq>" ..
+		"<iq id='sub' to='pubsub.push.bbc.co.uk' type='set' xmlns='jabber:client' from='" .. username .. "@push.bbc.co.uk/pubsub'>" .. "<pubsub xmlns='http://jabber.org/protocol/pubsub'><subscribe jid='" .. username .. "@push.bbc.co.uk/pubsub' node='" .. node .. "' /></pubsub></iq>"
+
+	log:info("livetxt connect to: ", ip, " port: ", port)
+
+	local sock = SocketTcp(jnt, ip, port, "BBClivetxt")
+
+	sock:t_connect()
+
+	livetxtsock = sock
+
+	sock:t_addWrite(function(err)
+						log:debug("sending livetxt request: ", request)
+						if (err) then
+							log:warn(err)
+							return _handleDisconnect(self, err)
+						end
+						sock.t_sock:send(request)
+						sock:t_removeWrite()
+					end,
+					10)
+
+	local capture, captext = false, ""
+	local p = lxp.new({
+		StartElement = function (parser, name, attr)
+			if name == "text" then
+				capture = true
+			end
+		end,
+		CharacterData = function (parser, text)
+			if capture then
+				captext = captext .. text
+			end
+		end,
+		EndElement = function()
+			if capture then
+				log:debug(captext)
+				local track, artist = string.match(captext, "Now playing: (.-) by (.-)%.")
+				if track == nil or artist == nil then
+					track, artist = captext, ""
+				end
+				playback.slimproto:send({ opcode = "META", 
+										  data = "artist=" .. mime.b64(track) .. "&album=" .. (mime.b64(artist) or "") .. "&" 
+									  })
+				capture, captext = false, ""
+			end
+		end,
+	})
+
+	local stream = playback.stream
+
+	sock:t_addRead(function()
+					   if playback.stream == nil or playback.stream ~= stream then
+						   log:info("stream changed killing livetxt")
+						   sock:t_removeRead()
+						   sock:close()
+						   return
+					   end
+					   local chunk, err, partial = sock.t_sock:receive(4096)
+					   local xml = chunk or partial
+					   if err and err ~= "timeout" then
+						   log:error(err)
+						   sock:t_removeRead()
+					   end
+					   log:debug("read livetxt: ", xml)
+					   p:parse(xml)
+				   end, 
+				   60)
+end
