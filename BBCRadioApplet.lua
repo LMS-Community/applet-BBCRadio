@@ -134,7 +134,7 @@ local localradio = {
 
 local tzoffset = os.time(os.date("*t")) - os.time(os.date("!*t"))
 
-function str2timeZ(timestr)
+local function str2timeZ(timestr)
 	local year, mon, mday, hour, min, sec = string.match(timestr, "(%d+)-(%d+)-(%d+)T(%d+):(%d+):(%d+)Z")
 	return os.time({ hour = hour, min = min, sec = sec, year = year, month = mon, day = mday }) + tzoffset
 end
@@ -188,7 +188,7 @@ function menu(self, menuItem)
 			callback = function(_, menuItem)
 				local url = la_prefix .. entry.id
 				log:info("fetching: ", url)
-				local req = RequestHttp(self:_sink(menu, menuItem.text, entry.service), 'GET', url, { stream = true })
+				local req = RequestHttp(self:_sinkXMLParser(menu, menuItem.text, entry.service), 'GET', url, { stream = true })
 				local uri = req:getURI()
 				local http = SocketHttp(jnt, uri.host, uri.port, uri.host)
 				http:fetch(req)
@@ -202,7 +202,7 @@ function menu(self, menuItem)
 			callback = function(_, menuItem)
 				local url = la_prefix .. entry.id .. ".xml"
 				log:info("fetching: ", url)
-				local req = RequestHttp(self:_sink(menu, menuItem.text, entry.service), 'GET', url, { stream = true })
+				local req = RequestHttp(self:_sinkXMLParser(menu, menuItem.text, entry.service), 'GET', url, { stream = true })
 				local uri = req:getURI()
 				local http = SocketHttp(jnt, uri.host, uri.port, uri.host)
 				http:fetch(req)
@@ -228,35 +228,36 @@ function menu(self, menuItem)
 end
 
 
-function _sink(self, prevmenu, title, service)
+function _sinkXMLParser(self, prevmenu, title, service)
 	local window = Window("text_list", title)
 	local menu   = SimpleMenu("menu")
 	menu:setComparator(SimpleMenu.itemComparatorWeightAlpha)
 	window:addWidget(menu)
 	prevmenu:lock()
 
-	local submenus = {}
+	local daymenus = {}
+	local brandmenus = {}
 	local entry
 	local capture
 	local now = os.time()
 	local today = os.date("*t").day
-	local pos = 10
+	local pos = 9
 
 	local p = lxp.new({
 		StartElement = function (parser, name, attr)
 			capture = nil			   
 			if name == "entry" then
-				entry = { epid = attr.pid }
+				entry = {}
 			elseif name == "title" or name == "pid" or name == "service" or name == "title" or name == "synopsis" or name == "link" then
 				capture = name
 			elseif name == "parent" then
 				capture = string.lower(attr.type)
 			elseif name == "broadcast" then
-				entry.bcast = str2timeZ(attr["start"])
+				entry.bcast = attr["start"]
 				entry.dur   = attr["duration"]
 			elseif name == "availability" then
-				entry.astart = str2timeZ(attr["start"])
-				entry.aend   = str2timeZ(attr["end"])
+				entry.astart = attr["start"]
+				entry.aend   = attr["end"]
 			end
 		end,
 		CharacterData = function (parser, string)
@@ -267,45 +268,90 @@ function _sink(self, prevmenu, title, service)
 		EndElement = function (parser, name)
 			if name == "entry" then
 				if service and service ~= entry.service then
-					log:debug("wrong service (", entry.service, " != ", service, ")")
+					--log:debug("wrong service (", entry.service, " != ", service, ")")
 					return
 				end
-				if entry.astart > now or entry.aend < now then
-					log:debug("not available (", entry.astart, " - ", entry.aend, " outside ", now, ")")
+				if  str2timeZ(entry.astart) > now or str2timeZ(entry.aend) < now then
+					--log:debug("not available (", entry.astart, " - ", entry.aend, ")")
 					return
 				end
 
-				local submenu
-				local date = os.date("*t", entry.bcast)
-				local title = string.match(entry.title, "(.-), %d+%/%d+%/%d") or entry.title
-				if submenus[date.day] then
-					submenu = submenus[date.day]
+				local title   = string.match(entry.title, "(.-), %d+%/%d+%/%d") or entry.title
+				local bcast   = str2timeZ(entry.bcast)
+				local date    = os.date("*t", bcast)
+				local daystr  = os.date("%A", bcast)
+				local timestr = string.format("%02d:%02d ", date.hour, date.min)
+
+				-- shared table and closure for menus
+				local playt  = { url = entry.link, title = title, desc = entry.synopsis, 
+								 img = string.format(img_templ, entry.pid), dur = entry.dur }
+				local playcb = function()
+								   self:_play(playt)
+								   appletManager:callService('goNowPlaying', Window.transitionPushLeft, false)
+							   end
+
+				-- by day menus
+				local daymenu
+				if daymenus[date.day] then
+					daymenu = daymenus[date.day]
 				else
-					submenu = SimpleMenu("menu")
-					submenus[date.day] = submenu
+					daymenu = SimpleMenu("menu")
+					daymenus[date.day] = daymenu
 
 					menu:addItem({
-						text = date.day == today and "Today" or os.date("%A", entry.bcast),
+						text = date.day == today and "Today" or daystr,
 						sound = "WINDOWSHOW",
 						weight = pos,
 						callback = function(_, menuItem)
 							local window = Window("text_list", menuItem.text)
-							window:addWidget(submenu)
+							local oldwindow = daymenu:getWindow()
+							if oldwindow then
+								oldwindow:removeWidget(daymenu)
+							end
+							window:addWidget(daymenu)
 							self:tieAndShowWindow(window)
 						end
 					})
 					pos = pos - 1
 				end
-				local url, desc, pid, dur = entry.link, entry.synopsis, entry.pid, entry.dur
-				submenu:addItem({
-					text = string.format("%02d:%02d %s", date.hour, date.min, title),
+				daymenu:addItem({
+					text = timestr .. title,
 					isPlayableItem = 1,
 					style = 'item_choice',
-					callback = function()
-						self:_play({ url = url, title = title, desc = desc, img = string.format(img_templ, pid), dur = dur })
-						appletManager:callService('goNowPlaying', Window.transitionPushLeft, false)
-					end,
-					weight = 2
+					callback = playcb,
+				})
+
+				-- by brand menus
+				local brand = entry.brand or entry.series or entry.title
+				local brandmenu
+				if brand == nil then
+					return
+				elseif brandmenus[brand] then
+					brandmenu = brandmenus[brand]
+				else
+					brandmenu = SimpleMenu("menu")
+					brandmenus[brand] = brandmenu
+
+					menu:addItem({
+						text = brand,
+						sound = "WINDOWSHOW",
+						weight = 10,
+						callback = function(_, menuItem)
+							local window = Window("text_list", menuItem.text)
+							local oldwindow = brandmenu:getWindow()
+							if oldwindow then
+								oldwindow:removeWidget(brandmenu)
+							end
+							window:addWidget(brandmenu)
+							self:tieAndShowWindow(window)
+						end
+					})
+				end
+				brandmenu:addItem({
+					text = timestr .. daystr,
+					isPlayableItem = 1,
+					style = 'item_choice',
+					callback = playcb,
 				})
 			end
 		end
@@ -407,7 +453,7 @@ function _sinkMSParser(self, playback, data, decode)
 				self:_playstreamRTMP(playback, data, decode, entry)
 			elseif string.match(entry["service"], "stream_wma") then
 				log:info("asx: ", entry["href"])
-				local req = RequestHttp(_sink2ASX(self, playback, data, decode), 'GET', entry["href"], {})
+				local req = RequestHttp(_sinkASXParser(self, playback, data, decode), 'GET', entry["href"], {})
 				local uri = req:getURI()
 				local http = SocketHttp(jnt, uri.host, uri.port, uri.host)
 				http:fetch(req)
@@ -450,7 +496,7 @@ end
 
 
 -- sink to parse asx - currently extracts first stream
-function _sink2ASX(self, playback, data, decode)
+function _sinkASXParser(self, playback, data, decode)
 	local streams = {}
 	local capture
 	local p = lxp.new({
