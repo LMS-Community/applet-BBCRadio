@@ -50,21 +50,35 @@ function registerApplet(self)
 					 end
 
 	self.menu = self:menuItem('appletBBCRadio', 'hidden', 'BBC Radio', 
-							   function(applet, ...) applet:menu(...) end, 0, { icon = icon }, "hm_radio")
+							  function(applet, ...) applet:menu(...) end, 0, { icon = icon }, "hm_radio")
 	jiveMain:addItem(self.menu)
 					 
-	self:registerService("bbcmsparser")
+	self:registerService("bbcparser")
 
-	Playback:registerHandler('bbcmsparser', function(...) appletManager:callService("bbcmsparser", ...) end)
+	Playback:registerHandler('bbcmsparser',  function(...) appletManager:callService("bbcparser", "ms", ...)  end)
+	Playback:registerHandler('bbcplsparser', function(...) appletManager:callService("bbcparser", "pls", ...) end)
 end
 
 
 function notify_playerCurrent(self, player)
 	if player and player == Player:getLocalPlayer() then
 		log:debug("local player selected - adding to menu")
-		jiveMain:addItemToNode(self.menu, 'radios')
+		local menus = appletManager:getAppletInstance("SlimMenus")
+		if menus._addMyAppsNode then
+			if not menus.myAppsNode then
+				menus:_addMyAppsNode()
+			end
+			jiveMain:addItemToNode(self.menu, 'myApps')
+		else
+			jiveMain:addItemToNode(self.menu, 'radios')
+		end
 	else
 		log:debug("local player not selected - removing from menu")
-		jiveMain:removeItemFromNode(self.menu, 'radios')
+		local menus = appletManager:getAppletInstance("SlimMenus")
+		if menus._addMyAppsNode then
+			jiveMain:removeItemFromNode(self.menu, 'myApps')
+		else
+			jiveMain:removeItemFromNode(self.menu, 'radios')
+		end
 	end
 end

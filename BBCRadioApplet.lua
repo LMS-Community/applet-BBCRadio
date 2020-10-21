@@ -46,29 +46,30 @@ local JIVE_VERSION     = jive.JIVE_VERSION
 module(..., Framework.constants)
 oo.class(_M, Applet)
 
-local live_prefix = "http://www.bbc.co.uk/mediaselector/4/mtis/stream/"
-local la_prefix   = "http://www.bbc.co.uk/radio/aod/availability/"
-local img1_prefix = "http://www.bbc.co.uk/radio/imda/logos/"
-local img2_prefix = "http://www.bbc.co.uk/iplayer/img/"
-local img_templ   = "http://node1.bbcimg.co.uk/iplayer/images/episode/%s_512_288.jpg"
-local lt_prefix   = "pubsub.livetext."
+local live_prefix   = "http://www.bbc.co.uk/mediaselector/4/mtis/stream/"
+local livepls_templ = "http://www.bbc.co.uk/radio/listen/live/%s_aaclca.pls"
+local la_prefix     = "http://www.bbc.co.uk/radio/aod/availability/"
+local img1_prefix   = "http://www.bbc.co.uk/radio/imda/logos/"
+local img2_prefix   = "http://www.bbc.co.uk/iplayer/img/"
+local img_templ     = "http://node1.bbcimg.co.uk/iplayer/images/episode/%s_512_288.jpg"
+local lt_prefix     = "pubsub.livetext."
 
 local live = {
-	{ text = "BBC Radio 1",       id = "bbc_radio_one",       img1 = "radio1_logomobile1-1.png",        lt = "radio1" },
-	{ text = "BBC Radio 1 Xtra",  id = "bbc_1xtra",           img1 = "radio1x_logomobile1-1.png",       lt = "1xtra"  },
-	{ text = "BBC Radio 2",       id = "bbc_radio_two",       img1 = "radio2_logomobile1-1.png",        lt = "radio2" },
-	{ text = "BBC Radio 3",       id = "bbc_radio_three",     img1 = "radio3_logomobile1-1.png",        lt = "radio3" },
+	{ text = "BBC Radio 1",       id = "bbc_radio_one",       pls = "r1",  img1 = "radio1_logomobile1-1.png",   lt = "radio1" },
+	{ text = "BBC Radio 1 Xtra",  id = "bbc_1xtra",           pls = "r1x", img1 = "radio1x_logomobile1-1.png",  lt = "1xtra"  },
+	{ text = "BBC Radio 2",       id = "bbc_radio_two",       pls = "r2",  img1 = "radio2_logomobile1-1.png",   lt = "radio2" },
+	{ text = "BBC Radio 3",       id = "bbc_radio_three",     pls = "r3",  img1 = "radio3_logomobile1-1.png",   lt = "radio3" },
 	{ text = "BBC Radio 3 HD",    url= "http://www.bbc.co.uk/radio3/r3_xhq.xml", parser = "BBCPlaylistParser", 
 	  img1 = "radio3_logomobile1-1.png", lt = "radio3"  },
-	{ text = "BBC Radio 4 FM",    id = "bbc_radio_fourfm",    img1 = "radio4_logomobile1-1.png",        lt = "radio4" },
-	{ text = "BBC Radio 4 LW",    id = "bbc_radio_fourlw",    img1 = "radio4_logomobile1-1.png"                       },
-	{ text = "BBC Radio 4 Extra", id = "bbc_radio_four_extra",img1 = "radio4x_logomobile1-1.png",       lt = "bbc7"   },
-	{ text = "BBC Radio 5 Live",  id = "bbc_radio_five_live", img1 = "radio5l_logomobile1-1.png",       lt = "radio5live" },
-	{ text = "BBC Radio 5 Sports",id = "bbc_radio_five_live_sports_extra", img1 = "radio5lspx_logomobile1-1.png", lt = "sportsextra" },
-	{ text = "BBC Radio 6 Music", id = "bbc_6music",          img1 = "radio6_logomobile1-1.png",        lt = "6music" },
-	{ text = "BBC Asian Network", id = "bbc_asian_network",   img1 = "radioan_logomobile1-1.png",       lt = "asiannetwork" },
-	{ text = "BBC World Service", id = "bbc_world_service",   img2 = "radio/bbc_world_service.gif",     lt = "worldservice" },
-	{ text = "BBC Radio Scotland",id = "bbc_radio_scotland",  img2 = "radio/bbc_radio_scotland_1.gif",  lt = "radioscotland" },
+	{ text = "BBC Radio 4 FM",    id = "bbc_radio_fourfm",    pls = "r4",  img1 = "radio4_logomobile1-1.png",   lt = "radio4" },
+	{ text = "BBC Radio 4 LW",    id = "bbc_radio_fourlw",    pls = "r4lw",img1 = "radio4_logomobile1-1.png"                  },
+	{ text = "BBC Radio 4 Extra", id = "bbc_radio_four_extra",pls = "r4x", img1 = "radio4x_logomobile1-1.png",  lt = "bbc7"   },
+	{ text = "BBC Radio 5 Live",  id = "bbc_radio_five_live", pls = "r5l", img1 = "radio5l_logomobile1-1.png",  lt = "radio5live" },
+	{ text = "BBC Radio 5 Sports",id = "bbc_radio_five_live_sports_extra", pls = "r5lsp", img1 = "radio5lspx_logomobile1-1.png", lt = "sportsextra" },
+	{ text = "BBC Radio 6 Music", id = "bbc_6music",          pls = "r6",  img1 = "radio6_logomobile1-1.png",   lt = "6music" },
+	{ text = "BBC Asian Network", id = "bbc_asian_network",   pls = "ran", img1 = "radioan_logomobile1-1.png",  lt = "asiannetwork" },
+	{ text = "BBC World Service", id = "bbc_world_service",   img2 = "radio/bbc_world_service.gif",             lt = "worldservice" },
+	{ text = "BBC Radio Scotland",id = "bbc_radio_scotland",  img2 = "radio/bbc_radio_scotland_1.gif",          lt = "radioscotland" },
 	{ text = "BBC Radio nan Gaidheal", id = "bbc_radio_nan_gaidheal", img2 = "radio/bbc_radio_nan_gaidheal.gif"       },
 	{ text = "BBC Radio Ulster",  id = "bbc_radio_ulster",    img2 = "radio/bbc_radio_ulster.gif"                     },
 	{ text = "BBC Radio Foyle",   id = "bbc_radio_foyle",     img2 = "station_logos/bbc_radio_foyle.png"              },
@@ -138,7 +139,7 @@ local localradio = {
 	{ text = "BBC York",          id = "bbc_radio_york"      },
 }
 
-local specialevents = { text = "Special Events", url = "http://xdevtriodeplugins.2.xpdev-hosted.com/specialevents.opml" }
+local specialevents = { text = "Special Events", url = "http://xdevtriodeplugins.xpdev-hosted.com/specialevents.opml" }
 
 local tzoffset
 
@@ -176,6 +177,7 @@ function menu(self, menuItem)
 		callback = function(_, menuItem)
 			local window = Window("text_list", menuItem.text)
 			local menu   = SimpleMenu("menu")
+			local usewma = self:getSettings()["usewma"]
 			for _, entry in pairs(live) do
 				local img = entry.img1 and (img1_prefix .. entry.img1) or (entry.img2 and (img2_prefix .. entry.img2))
 				local icon
@@ -183,11 +185,17 @@ function menu(self, menuItem)
 					icon = Icon("icon")
 					self.server:fetchArtwork(img, icon, jiveMain:getSkinParam('THUMB_SIZE'), 'png')
 				end
+				local playable = { title = entry.text, img = img, livetxt = entry.lt and ( lt_prefix .. entry.lt ) or nil, 
+								   parser = entry.parser, self = self }
+				if entry.pls and not usewma then
+					playable.pls = string.format(livepls_templ, entry.pls)
+				else
+					playable.url = entry.url or (live_prefix .. entry.id)
+				end
 				menu:addItem({
 					text = entry.text,
 					icon = icon,
-					isPlayableItem = { url = entry.url or (live_prefix .. entry.id), title = entry.text, img = img,
-									   livetxt = entry.lt and ( lt_prefix .. entry.lt ) or nil, parser = entry.parser, self = self },
+					isPlayableItem = playable,
 					style = 'item_choice',
 					callback = _menuAction,
 					cmCallback = _menuAction,
@@ -261,7 +269,7 @@ function menu(self, menuItem)
 		text  = "Streams:",
 		style = 'item_choice',
 		check = Choice("choice", 
-					   { "WMA", "Flash AAC/MP3" },
+					   { "WMA", "AAC/MP3" },
 					   function(object, isSelected)
 						   self:getSettings()["usewma"] = (isSelected == 1)
 						   self:storeSettings()
@@ -559,6 +567,8 @@ _menuAction = function(event, item, stream)
 
 	if stream.rawurl then
 		url = stream.rawurl
+	elseif stream.pls then
+		url = "spdr://bbcplsparser?url=" .. mime.b64(stream.pls)
 	else
 		url = "spdr://bbcmsparser?url=" .. mime.b64(stream.url)
 	end
@@ -588,8 +598,8 @@ end
 ------------------------------------------------------
 -- code below is the protocol handler for playing streams via spdr:// urls
 
--- protocol handler registered in meta - fetch the mediaselector xml
-function bbcmsparser(self, playback, data, decode)
+-- protocol handler registered in meta to play bbcmsparser and bbcplsparser
+function bbcparser(self, type, playback, data, decode)
 	local cmdstr = playback.header .. "&"			   
 	local url = string.match(cmdstr, "url%=(.-)%&")
 	url = mime.unb64("", url)
@@ -606,11 +616,25 @@ function bbcmsparser(self, playback, data, decode)
 		data.livetxt = mime.unb64("", data.livetxt)
 		log:info("livetxt: ", data.livetxt)
 	end
+
+	data.spdrver = string.match(cmdstr,"ver%=(.-)%&")
+	if data.spdrver then
+		log:info("spdrver: ", data.spdrver)
+	end
 	
-	local req = RequestHttp(_sinkMSParser(self, playback, data, decode), 'GET', url)
-	local uri = req:getURI()
-	local http = SocketHttp(jnt, uri.host, uri.port, uri.host)
-	http:fetch(req)
+	if type == 'ms' then
+		local req = RequestHttp(_sinkMSParser(self, playback, data, decode), 'GET', url)
+		local uri = req:getURI()
+		local http = SocketHttp(jnt, uri.host, uri.port, uri.host)
+		http:fetch(req)
+	elseif type == 'pls' then
+		local req = RequestHttp(_sinkPLSParser(self, playback, data, decode), 'GET', url)
+		local uri = req:getURI()
+		local http = SocketHttp(jnt, uri.host, uri.port, uri.host)
+		http:fetch(req)
+	else
+		log:warn("bad parser type: ", type)
+	end
 end
 
 
@@ -666,6 +690,26 @@ function _sinkMSParser(self, playback, data, decode)
 			return
 		else
 			p:parse(content)
+		end
+	end
+end
+
+
+-- sink to parse mediaselector xml
+function _sinkPLSParser(self, playback, data, decode)
+	local streams = {}
+	return function(content)
+		if content == nil then
+			if streams[1] then
+				-- assume stream in pls file is aac for the moment
+				self:_playstreamAAC(playback, data, decode, streams[1])
+			else
+				log:warn("no stream found")
+			end
+			return
+		else
+			local stream = string.match(content, "File%d%=(.-)%c")
+			streams[#streams+1] = stream
 		end
 	end
 end
@@ -773,6 +817,22 @@ function _playstreamWMA(self, playback, data, decode, stream, bitrate)
 		"\r\n"
 
 	self:_playstream(playback, data, decode, url.host, url.port or 80, 'w', 10, string.byte(1), 1, bitrate)
+end
+
+
+-- play an AAC stream
+function _playstreamAAC(self, playback, data, decode, stream, bitrate)
+	log:info("playing: ", stream)
+
+	local url = socketurl.parse(stream)
+	playback.header =
+		"GET " .. url.path .. (url.query and ("?" .. url.query) or "") .. " HTTP/1.0\r\n" ..
+		"Accept: audio/aac,audio/aacp\r\n" ..
+		"User-Agent: SqueezePlay/BBCRadioApplet\r\n" ..
+		"Host: " .. url.host .. "\r\n" ..
+		"\r\n"
+
+	self:_playstream(playback, data, decode, url.host, url.port or 80, 'a', 0, string.byte(2), nil, bitrate)
 end
 
 
@@ -892,7 +952,7 @@ function _playstream(self, playback, data, decode, host, port, codec, outputthre
 									 playback.slimproto:send({ opcode = "META", data = "type=" .. mime.b64(type) .. "&" })
 									 
 									 if data.livetxt then
-										 self:_livetxt(data.livetxt, playback, bitrate)
+										 self:_livetxt(data.livetxt, playback, bitrate, data.spdrver)
 									 end
 
 								 else
@@ -905,7 +965,7 @@ end
 
 local livetxtsock
 
-function _livetxt(self, node, playback, bitrate)
+function _livetxt(self, node, playback, bitrate, spdrver)
 	log:info("opening live text connection for: ", node)
 
 	-- make sure we only have one connection to the server open at one time
@@ -966,15 +1026,22 @@ function _livetxt(self, node, playback, bitrate)
 				log:info("text: ", captext, ", delay ", delay)
 				local track, artist = string.match(captext, "Now playing: (.-) by (.-)%.")
 				if track == nil or artist == nil then
-					track, artist = captext, ""
+					track, artist = nil, captext
 				end
 				-- send the meta after delay to sync with audio - verify same stream is playing first
 				Timer(1000 * delay,
 					function()
-						if playback.stream == curstream then										
-							log:info("sending now artist: ", track, " album: ", artist)
-							playback.slimproto:send({ opcode = "META", data = "artist=" .. mime.b64(track) .. "&album=" .. 
-												  (mime.b64(artist) or "") .. "&" })
+						if playback.stream == curstream then
+							if spdrver == nil then
+								log:info("sending now artist: ", track, " album: ", artist)
+								playback.slimproto:send({ opcode = "META", data = "artist=" .. mime.b64(track) .. "&album=" .. 
+													  (mime.b64(artist) or "") .. "&" })
+							else
+								log:info("sending now title: ", track, " artist: ", artist)
+								playback.slimproto:send({ opcode = "META", 
+														  data = (track and ("title=" .. mime.b64(track)) or "") .. 
+														  (artist and ("&artist=" .. mime.b64(artist)) or "") .. "&" })
+							end
 						end
 					end,
 					true
