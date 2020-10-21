@@ -3,7 +3,7 @@
 -- Allows Squeezeplay players connected to MySqueezebox.com to play BBC Radio streams without requring
 -- a local server and server plugin
 --
--- Copyright (c) 2010, Adrian Smith, (Triode) triode1@btinternet.com
+-- Copyright (c) 2010, 2011 Adrian Smith, (Triode) triode1@btinternet.com
 --
 -- Released under the BSD license for use with the Logitech Squeezeplay application
 
@@ -26,6 +26,7 @@ local SocketTcp        = require("jive.net.SocketTcp")
 local Framework        = require("jive.ui.Framework")
 local Window           = require("jive.ui.Window")
 local SimpleMenu       = require("jive.ui.SimpleMenu")
+local Icon             = require("jive.ui.Icon")
 local Choice           = require("jive.ui.Choice")
 local Task             = require("jive.ui.Task")
 local Timer            = require("jive.ui.Timer")
@@ -37,6 +38,7 @@ local dns              = require("jive.net.DNS")
 local hasDecode, decode= pcall(require, "squeezeplay.decode")
 
 local appletManager    = appletManager
+local jiveMain         = jiveMain
 local jnt              = jnt
 
 local JIVE_VERSION     = jive.JIVE_VERSION
@@ -46,50 +48,52 @@ oo.class(_M, Applet)
 
 local live_prefix = "http://www.bbc.co.uk/mediaselector/4/mtis/stream/"
 local la_prefix   = "http://www.bbc.co.uk/radio/aod/availability/"
-local img_prefix  = "http://www.bbc.co.uk/iplayer/img/"
+local img1_prefix = "http://www.bbc.co.uk/radio/imda/logos/"
+local img2_prefix = "http://www.bbc.co.uk/iplayer/img/"
 local img_templ   = "http://node1.bbcimg.co.uk/iplayer/images/episode/%s_512_288.jpg"
 local lt_prefix   = "pubsub.livetext."
 
 local live = {
-	{ text = "BBC Radio 1",       id = "bbc_radio_one",     img = "radio/bbc_radio_one.gif",     lt = "radio1"  },
-	{ text = "BBC Radio 1Xtra",   id = "bbc_1xtra",         img = "radio/bbc_radio_two.gif",     lt = "1xtra"   },
-	{ text = "BBC Radio 2",       id = "bbc_radio_two",     img = "radio/bbc_radio_two.gif",     lt = "radio2"  },
-	{ text = "BBC Radio 3",       id = "bbc_radio_three",   img = "radio/bbc_radio_three.gif",   lt = "radio3"  },
+	{ text = "BBC Radio 1",       id = "bbc_radio_one",       img1 = "radio1_logomobile1-1.png",        lt = "radio1" },
+	{ text = "BBC Radio 1 Xtra",  id = "bbc_1xtra",           img1 = "radio1x_logomobile1-1.png",       lt = "1xtra"  },
+	{ text = "BBC Radio 2",       id = "bbc_radio_two",       img1 = "radio2_logomobile1-1.png",        lt = "radio2" },
+	{ text = "BBC Radio 3",       id = "bbc_radio_three",     img1 = "radio3_logomobile1-1.png",        lt = "radio3" },
 	{ text = "BBC Radio 3 HD",    url= "http://www.bbc.co.uk/radio3/r3_xhq.xml", parser = "BBCPlaylistParser", 
-	  img = "radio/bbc_radio_three.gif", lt = "radio3"  },
-	{ text = "BBC Radio 4 FM",    id = "bbc_radio_fourfm",  img = "radio/bbc_radio_four.gif",    lt = "radio4"  },
-	{ text = "BBC Radio 4 LW",    id = "bbc_radio_fourlw",  img = "radio/bbc_radio_four.gif"                    },
-	{ text = "BBC Radio 5 Live",  id = "bbc_radio_five_live", img = "radio/bbc_radio_five_live.gif", lt = "radio5live" },
-	{ text = "BBC Radio 5 Sports",id = "bbc_radio_five_live_sports_extra", img = "radio/bbc_radio_five_live_sports_extra.gif", lt = "sportsextra" },
-	{ text = "BBC Radio 6 Music", id = "bbc_6music",        img = "radio/bbc_6music.gif",        lt = "6music"  },
-	{ text = "BBC Radio 7",       id = "bbc_7",             img = "radio/bbc_7.gif",             lt = "bbc7"    },
-	{ text = "BBC Asian Network", id = "bbc_asian_network", img = "radio/bbc_asian_network.gif", lt = "asiannetwork" },
-	{ text = "BBC World Service", id = "bbc_world_service", img = "radio/bbc_world_service.gif", lt = "worldservice" },
-	{ text = "BBC Radio Scotland",id = "bbc_radio_scotland",img = "radio/bbc_radio_scotland_1.gif", lt = "radioscotland" },
-	{ text = "BBC Radio nan Gaidheal", id = "bbc_radio_nan_gaidheal", img = "radio/bbc_radio_nan_gaidheal.gif"  },
-	{ text = "BBC Radio Ulster",  id = "bbc_radio_ulster",  img = "radio/bbc_radio_ulster.gif"                  },
-	{ text = "BBC Radio Foyle",   id = "bbc_radio_foyle",   img = "station_logos/bbc_radio_foyle.png"           },
-	{ text = "BBC Radio Wales",   id = "bbc_radio_wales",   img = "radio/bbc_radio_wales.gif"                   },
-	{ text = "BBC Radio Cymru",   id = "bbc_radio_cymru",   img = "radio/bbc_radio_cymru.gif"                   },
+	  img1 = "radio3_logomobile1-1.png", lt = "radio3"  },
+	{ text = "BBC Radio 4 FM",    id = "bbc_radio_fourfm",    img1 = "radio4_logomobile1-1.png",        lt = "radio4" },
+	{ text = "BBC Radio 4 LW",    id = "bbc_radio_fourlw",    img1 = "radio4_logomobile1-1.png"                       },
+	{ text = "BBC Radio 4 Extra", id = "bbc_radio_four_extra",img1 = "radio4x_logomobile1-1.png",       lt = "bbc7"   },
+	{ text = "BBC Radio 5 Live",  id = "bbc_radio_five_live", img1 = "radio5l_logomobile1-1.png",       lt = "radio5live" },
+	{ text = "BBC Radio 5 Sports",id = "bbc_radio_five_live_sports_extra", img1 = "radio5lspx_logomobile1-1.png", lt = "sportsextra" },
+	{ text = "BBC Radio 6 Music", id = "bbc_6music",          img1 = "radio6_logomobile1-1.png",        lt = "6music" },
+	{ text = "BBC Asian Network", id = "bbc_asian_network",   img1 = "radioan_logomobile1-1.png",       lt = "asiannetwork" },
+	{ text = "BBC World Service", id = "bbc_world_service",   img2 = "radio/bbc_world_service.gif",     lt = "worldservice" },
+	{ text = "BBC Radio Scotland",id = "bbc_radio_scotland",  img2 = "radio/bbc_radio_scotland_1.gif",  lt = "radioscotland" },
+	{ text = "BBC Radio nan Gaidheal", id = "bbc_radio_nan_gaidheal", img2 = "radio/bbc_radio_nan_gaidheal.gif"       },
+	{ text = "BBC Radio Ulster",  id = "bbc_radio_ulster",    img2 = "radio/bbc_radio_ulster.gif"                     },
+	{ text = "BBC Radio Foyle",   id = "bbc_radio_foyle",     img2 = "station_logos/bbc_radio_foyle.png"              },
+	{ text = "BBC Radio Wales",   id = "bbc_radio_wales",     img2 = "radio/bbc_radio_wales.gif"                      },
+	{ text = "BBC Radio Cymru",   id = "bbc_radio_cymru",     img2 = "radio/bbc_radio_cymru.gif"                      },
 }
 
 local listenagain = {
-	{ text = "BBC Radio 1",       id = "radio1.xml",      },
-	{ text = "BBC Radio 1Xtra",   id = "1xtra.xml",       },
-	{ text = "BBC Radio 2",       id = "radio2.xml",      },
-	{ text = "BBC Radio 3",       id = "radio3.xml",      },
-	{ text = "BBC Radio 4 FM",    id = "radio4.xml",      service = "bbc_radio_fourfm" },
-	{ text = "BBC Radio 4 LW",    id = "radio4.xml",      service = "bbc_radio_fourlw" },
-	{ text = "BBC Radio 5 Live",  id = "fivelive.xml",    },
-	{ text = "BBC Radio 6 Music", id = "6music.xml",      },
-	{ text = "BBC Radio 7",       id = "bbc7.xml",        },
-	{ text = "BBC Asian Network", id = "asiannetwork.xml" },
-	{ text = "BBC World Service", id = "worldservice.xml" },
-	{ text = "BBC Radio Scotland",id = "radioscotland.xml"},
-	{ text = "BBC Radio nan Gaidheal", id = "alba.xml"    },
-	{ text = "BBC Radio Ulster",  id = "radioulster.xml"  },
-	{ text = "BBC Radio Wales",   id = "radiowales.xml"   },
-	{ text = "BBC Radio Cymru",   id = "radiocymru.xml"   }
+	{ text = "BBC Radio 1",       id = "radio1.xml",          img1 = "radio1_logomobile1-1.png"    },
+	{ text = "BBC Radio 1 Xtra",  id = "1xtra.xml",           img1 = "radio1x_logomobile1-1.png"   },
+	{ text = "BBC Radio 2",       id = "radio2.xml",          img1 = "radio2_logomobile1-1.png"    },
+	{ text = "BBC Radio 3",       id = "radio3.xml",          img1 = "radio3_logomobile1-1.png"    },
+	{ text = "BBC Radio 4 FM",    id = "radio4.xml",          img1 = "radio4_logomobile1-1.png", service = "bbc_radio_fourfm" },
+	{ text = "BBC Radio 4 LW",    id = "radio4.xml",          img1 = "radio4_logomobile1-1.png", service = "bbc_radio_fourlw" },
+	{ text = "BBC Radio 4 Extra", id = "radio4extra.xml",     img1 = "radio4x_logomobile1-1.png"   },
+	{ text = "BBC Radio 5 Live",  id = "fivelive.xml",        img1 = "radio5l_logomobile1-1.png"   },
+	{ text = "BBC Radio 6 Music", id = "6music.xml",          img1 = "radio6_logomobile1-1.png"    },
+	{ text = "BBC Radio 7",       id = "bbc7.xml",            img1 = "radio7_logomobile1-1.png"    },
+	{ text = "BBC Asian Network", id = "asiannetwork.xml",    img1 = "radioan_logomobile1-1.png"   },
+	{ text = "BBC World Service", id = "worldservice.xml",    img2 = "radio/bbc_world_service.gif" },
+	{ text = "BBC Radio Scotland",id = "radioscotland.xml",   img2 = "radio/bbc_radio_scotland_1.gif" },
+	{ text = "BBC Radio nan Gaidheal", id = "alba.xml",       img2 = "radio/bbc_radio_nan_gaidheal.gif" },
+	{ text = "BBC Radio Ulster",  id = "radioulster.xml",     img2 = "radio/bbc_radio_ulster.gif"  },
+	{ text = "BBC Radio Wales",   id = "radiowales.xml",      img2 = "radio/bbc_radio_wales.gif"   },
+	{ text = "BBC Radio Cymru",   id = "radiocymru.xml",      img2 = "radio/bbc_radio_cymru.gif"   },
 }
 
 local localradio = {
@@ -160,6 +164,9 @@ function menu(self, menuItem)
 	local window = Window("text_list", menuItem.text)
 	local menu   = SimpleMenu("menu")
 
+	local player = Player:getLocalPlayer()
+	self.server = player:getSlimServer()
+
 	-- set the tzoffset on each use in case of dst changes
 	setTzOffset()
 
@@ -171,9 +178,16 @@ function menu(self, menuItem)
 			local window = Window("text_list", menuItem.text)
 			local menu   = SimpleMenu("menu")
 			for _, entry in pairs(live) do
+				local img = entry.img1 and (img1_prefix .. entry.img1) or (entry.img2 and (img2_prefix .. entry.img2))
+				local icon
+				if self.server and img then
+					icon = Icon("icon")
+					self.server:fetchArtwork(img, icon, jiveMain:getSkinParam('THUMB_SIZE'), 'png')
+				end
 				menu:addItem({
 					text = entry.text,
-					isPlayableItem = { url = entry.url or (live_prefix .. entry.id), title = entry.text, img = img_prefix .. entry.img,
+					icon = icon,
+					isPlayableItem = { url = entry.url or (live_prefix .. entry.id), title = entry.text, img = img,
 									   livetxt = entry.lt and ( lt_prefix .. entry.lt ) or nil, parser = entry.parser, self = self },
 					style = 'item_choice',
 					callback = _menuAction,
@@ -196,8 +210,15 @@ function menu(self, menuItem)
 
 	-- listen again menus - fetch the xml and parse into a menu as it is received
 	for _, entry in pairs(listenagain) do
+		local img = entry.img1 and (img1_prefix .. entry.img1) or (entry.img2 and (img2_prefix .. entry.img2))
+		local icon
+		if self.server and img then
+			icon = Icon("icon")
+			self.server:fetchArtwork(img, icon, jiveMain:getSkinParam('THUMB_SIZE'), 'png')
+		end
 		menu:addItem({
 			text = entry.text,
+			icon = icon,
 			sound = "WINDOWSHOW",
 			callback = function(_, menuItem)
 				local url = la_prefix .. entry.id
@@ -403,19 +424,27 @@ function _sinkOPMLParser(self, prevmenu, title)
 	prevmenu:lock()
 
 	local menus = { menu }
+	local leaf
 
 	local p = lxp.new({
 		StartElement = function (parser, name, attr)
 			if name == 'outline' and attr.text then
 				if attr.URL and attr.type and (attr.type == 'audio' or attr.type == 'playlist') then
 					-- playable item, possibly with parser
+					local playable
+					if attr.URL and attr.parser == nil then
+						playable = { rawurl = attr.URL, title = attr.text, self = self }
+					else
+						playable = { url = attr.URL, title = attr.text, self = self, parser = attr.parser }
+					end
 					menus[#menus]:addItem({
 						text = attr.text,
-						isPlayableItem = { url = attr.URL, title = attr.text, self = self, parser = attr.parser },
+						isPlayableItem = playable,
 						style = 'item_choice',
 						callback = _menuAction,
 						cmCallback = _menuAction,									
 					})
+					leaf = true
 				elseif attr.URL then
 					log:warn("no support for opml links")
 				else
@@ -432,13 +461,17 @@ function _sinkOPMLParser(self, prevmenu, title)
 						end
 					})
 					menus[#menus+1] = mymenu
+					leaf = false
 				end
 			end
 		end,
 		EndElement = function (parser, name)
 			if name == 'outline' then
-				-- pop back menu level
-				menus[#menu] = nil
+				if not leaf then
+					-- pop back menu level
+					menus[#menus] = nil
+				end
+				leaf = false
 			end
 		end
 	})
@@ -470,7 +503,7 @@ function _playlistParse(url, event, stream)
 						if entry.tag == 'summary' then
 							stream.desc = entry[1]
 						elseif entry.tag == 'link' and entry.attr.type and string.match(entry.attr.type, "image") then
-							stream.img = entry.attr.href
+							stream.img = stream.img or entry.attr.href
 						elseif entry.tag == 'item' then
 							for _, m in ipairs(entry) do
 								if type(m) == 'table' and m.tag == 'media' then
@@ -523,8 +556,13 @@ _menuAction = function(event, item, stream)
 	local self = stream.self
 	local player = Player:getLocalPlayer()
 	local server = player and player:getSlimServer()
+	local url
 
-	local url = "spdr://bbcmsparser?url=" .. mime.b64(stream.url)
+	if stream.rawurl then
+		url = stream.rawurl
+	else
+		url = "spdr://bbcmsparser?url=" .. mime.b64(stream.url)
+	end
 	if stream.img then
 		url = url .. "&icon=" .. mime.b64(stream.img)
 	end
