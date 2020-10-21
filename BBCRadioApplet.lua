@@ -184,8 +184,6 @@ function menu(self, menuItem)
 			local window = Window("text_list", menuItem.text)
 			local menu   = SimpleMenu("menu")
 			local usepls = self:getSettings()["streamtype"] == "mp3aac" or self:getSettings()["streamtype"] == "high"
-			local sshow  = self:getSettings()["livedisp"] == "slideshow"
-			local livet  = self:getSettings()["livedisp"] == "livetxt"
 			for _, entry in pairs(live) do
 				local img = entry.img1 and (img1_prefix .. entry.img1) or (entry.img2 and (img2_prefix .. entry.img2))
 				local icon
@@ -194,18 +192,13 @@ function menu(self, menuItem)
 					self.server:fetchArtwork(img, icon, jiveMain:getSkinParam('THUMB_SIZE'), 'png')
 				end
 				local playable = { title = entry.text, img = img, 
-								   livetxt = (entry.lt and not entry.vis and ( lt_prefix .. entry.lt )) or nil,
+								   livetxt = entry.lt and ( lt_prefix .. entry.lt ),
 								   radiovis = entry.vis,
 								   parser = entry.parser, self = self }
 				if entry.pls and usepls then
 					playable.pls = string.format(livepls_templ, entry.pls)
 				else
 					playable.url = entry.url or (live_prefix .. entry.id)
-				end
-				if sshow and entry.vis then
-					playable.radiovis = entry.vis
-				elseif (show or livet) and entry.lt then
-					playable.livetxt = lt_previx .. entry.lt
 				end
 				menu:addItem({
 					text = entry.text,
@@ -615,11 +608,13 @@ _menuAction = function(event, item, stream)
 	if stream.dur then
 		url = url .. "&dur=" .. mime.b64(stream.dur)
 	end
-	if stream.livetxt then
-		url = url .. "&livetxt=" .. mime.b64(stream.livetxt)
-	end
-	if stream.radiovis then
+
+	local livedisp = stream.self:getSettings()["livedisp"]
+
+	if stream.radiovis and livedisp == "slideshow" then
 		url = url .. "&radiovis=" .. mime.b64(stream.radiovis)
+	elseif stream.livetxt and livedisp ~= "none" then
+		url = url .. "&livetxt=" .. mime.b64(stream.livetxt)
 	end
 
 	log:info("sending ", action, " request to ", server, " player ", player, " url ", url)
