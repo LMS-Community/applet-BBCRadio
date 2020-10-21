@@ -7,7 +7,7 @@
 --
 -- Released under the BSD license for use with the Logitech Squeezeplay application
 
-local next, pairs, ipairs, type, package, string, tostring, pcall, math, table = next, pairs, ipairs, type, package, string, tostring, pcall, math, table
+local next, pairs, ipairs, type, package, string, tostring, tonumber, pcall, math, table = next, pairs, ipairs, type, package, string, tostring, tonumber, pcall, math, table
 
 local oo               = require("loop.simple")
 local debug            = require("jive.utils.debug")
@@ -58,29 +58,28 @@ local la_prefix     = "http://www.bbc.co.uk/radio/aod/availability/"
 local img1_prefix   = "http://www.bbc.co.uk/radio/imda/logos/"
 local img2_prefix   = "http://www.bbc.co.uk/iplayer/img/"
 local img_templ     = "http://node1.bbcimg.co.uk/iplayer/images/episode/%s_512_288.jpg"
-local lt_prefix     = "pubsub.livetext."
 
 local live = {
-	{ text = "BBC Radio 1",       id = "bbc_radio_one",       pls = "r1",  img1 = "radio1_logomobile1-1.png",   
-	  lt = "radio1", vis = "fm/ce1/c201/09880" },
-	{ text = "BBC Radio 1 Xtra",  id = "bbc_1xtra",           pls = "r1x", img1 = "radio1x_logomobile1-1.png",  
-	  lt = "1xtra",  vis = "dab/ce1/ce15/c22a/0"  },
-	{ text = "BBC Radio 2",       id = "bbc_radio_two",       pls = "r2",  img1 = "radio2_logomobile1-1.png",   lt = "radio2" },
-	{ text = "BBC Radio 3",       id = "bbc_radio_three",     pls = "r3",  img1 = "radio3_logomobile1-1.png",   lt = "radio3" },
-	{ text = "BBC Radio 4 FM",    id = "bbc_radio_fourfm",    pls = "r4",  img1 = "radio4_logomobile1-1.png",   lt = "radio4" },
-	{ text = "BBC Radio 4 LW",    id = "bbc_radio_fourlw",    pls = "r4lw",img1 = "radio4_logomobile1-1.png"                  },
-	{ text = "BBC Radio 4 Extra", id = "bbc_radio_four_extra",pls = "r4x", img1 = "radio4x_logomobile1-1.png",  lt = "bbc7"   },
-	{ text = "BBC Radio 5 Live",  id = "bbc_radio_five_live", pls = "r5l", img1 = "radio5l_logomobile1-1.png",  lt = "radio5live" },
-	{ text = "BBC Radio 5 Sports",id = "bbc_radio_five_live_sports_extra", pls = "r5lsp", img1 = "radio5lspx_logomobile1-1.png", lt = "sportsextra" },
-	{ text = "BBC Radio 6 Music", id = "bbc_6music",          pls = "r6",  img1 = "radio6_logomobile1-1.png",   lt = "6music" },
-	{ text = "BBC Asian Network", id = "bbc_asian_network",   pls = "ran", img1 = "radioan_logomobile1-1.png",  lt = "asiannetwork" },
-	{ text = "BBC World Service", id = "bbc_world_service",   img2 = "radio/bbc_world_service.gif",             lt = "worldservice" },
-	{ text = "BBC Radio Scotland",id = "bbc_radio_scotland_fm",img2 = "radio/bbc_radio_scotland_1.gif",         lt = "radioscotland" },
-	{ text = "BBC Radio nan Gaidheal", id = "bbc_radio_nan_gaidheal", img2 = "radio/bbc_radio_nan_gaidheal.gif"       },
-	{ text = "BBC Radio Ulster",  id = "bbc_radio_ulster",    img2 = "radio/bbc_radio_ulster.gif"                     },
-	{ text = "BBC Radio Foyle",   id = "bbc_radio_foyle",     img2 = "station_logos/bbc_radio_foyle.png"              },
-	{ text = "BBC Radio Wales",   id = "bbc_radio_wales_fm",  img2 = "radio/bbc_radio_wales.gif"                      },
-	{ text = "BBC Radio Cymru",   id = "bbc_radio_cymru",     img2 = "radio/bbc_radio_cymru.gif"                      },
+	{ text = "BBC Radio 1",       id = "bbc_radio_one",       pls = "r1",  img1 = "radio1_logomobile1-1.png",
+	  vis = "fm/ce1/c201/09880" },
+	{ text = "BBC Radio 1 Xtra",  id = "bbc_1xtra",           pls = "r1x", img1 = "radio1x_logomobile1-1.png",
+	  vis = "dab/ce1/ce15/c22a/0" },
+	{ text = "BBC Radio 2",       id = "bbc_radio_two",       pls = "r2",  img1 = "radio2_logomobile1-1.png"    },
+	{ text = "BBC Radio 3",       id = "bbc_radio_three",     pls = "r3",  img1 = "radio3_logomobile1-1.png"    },
+	{ text = "BBC Radio 4 FM",    id = "bbc_radio_fourfm",    pls = "r4",  img1 = "radio4_logomobile1-1.png"    },
+	{ text = "BBC Radio 4 LW",    id = "bbc_radio_fourlw",    pls = "r4lw",img1 = "radio4_logomobile1-1.png"    },
+	{ text = "BBC Radio 4 Extra", id = "bbc_radio_four_extra",pls = "r4x", img1 = "radio4x_logomobile1-1.png"   },
+	{ text = "BBC Radio 5 Live",  id = "bbc_radio_five_live", pls = "r5l", img1 = "radio5l_logomobile1-1.png"   },
+	{ text = "BBC Radio 5 Sports",id = "bbc_radio_five_live_sports_extra", pls = "r5lsp", img1 = "radio5lspx_logomobile1-1.png" },
+	{ text = "BBC Radio 6 Music", id = "bbc_6music",          pls = "r6",  img1 = "radio6_logomobile1-1.png",   },
+	{ text = "BBC Asian Network", id = "bbc_asian_network",   pls = "ran", img1 = "radioan_logomobile1-1.png",  },
+	{ text = "BBC World Service", id = "bbc_world_service",   img2 = "radio/bbc_world_service.gif",             },
+	{ text = "BBC Radio Scotland",id = "bbc_radio_scotland_fm",img2 = "radio/bbc_radio_scotland_1.gif",         },
+	{ text = "BBC Radio nan Gaidheal", id = "bbc_radio_nan_gaidheal", img2 = "radio/bbc_radio_nan_gaidheal.gif" },
+	{ text = "BBC Radio Ulster",  id = "bbc_radio_ulster",    img2 = "radio/bbc_radio_ulster.gif"               },
+	{ text = "BBC Radio Foyle",   id = "bbc_radio_foyle",     img2 = "station_logos/bbc_radio_foyle.png"        },
+	{ text = "BBC Radio Wales",   id = "bbc_radio_wales_fm",  img2 = "radio/bbc_radio_wales.gif"                },
+	{ text = "BBC Radio Cymru",   id = "bbc_radio_cymru",     img2 = "radio/bbc_radio_cymru.gif"                },
 }
 
 local listenagain = {
@@ -192,7 +191,6 @@ function menu(self, menuItem)
 					self.server:fetchArtwork(img, icon, jiveMain:getSkinParam('THUMB_SIZE'), 'png')
 				end
 				local playable = { title = entry.text, img = img, 
-								   livetxt = entry.lt and ( lt_prefix .. entry.lt ),
 								   radiovis = entry.vis,
 								   parser = entry.parser, self = self }
 				if entry.pls and usepls then
@@ -610,11 +608,12 @@ _menuAction = function(event, item, stream)
 	end
 
 	local livedisp = stream.self:getSettings()["livedisp"]
-
-	if stream.radiovis and livedisp == "slideshow" then
-		url = url .. "&radiovis=" .. mime.b64(stream.radiovis)
-	elseif stream.livetxt and livedisp ~= "none" then
-		url = url .. "&livetxt=" .. mime.b64(stream.livetxt)
+	if stream.radiovis then
+		if livedisp == "slideshow" then
+			url = url .. "&radiovis=" .. mime.b64(stream.radiovis .. "/image")
+		elseif livedisp ~= "none" then
+			url = url .. "&radiovis=" .. mime.b64(stream.radiovis .. "/text")
+		end
 	end
 
 	log:info("sending ", action, " request to ", server, " player ", player, " url ", url)
@@ -641,12 +640,6 @@ function bbcparser(self, type, playback, data, decode)
 	if data.start then
 		data.start = mime.unb64("", data.start)
 		log:info("start: ", data.start)
-	end
-
-	data.livetxt = string.match(cmdstr, "livetxt%=(.-)%&")
-	if data.livetxt then
-		data.livetxt = mime.unb64("", data.livetxt)
-		log:info("livetxt: ", data.livetxt)
 	end
 
 	data.radiovis = string.match(cmdstr, "radiovis%=(.-)%&")
@@ -715,12 +708,12 @@ function _sinkMSParser(self, playback, data, decode)
 			local type = self:getSettings()["streamtype"]
 			table.sort(streams, 
 				function(a, b)
-					local bitrateA = a.bitrate or 0
-					local bitrateB = b.bitrate or 0
+					local bitrateA = tonumber(a.bitrate) or 0
+					local bitrateB = tonumber(b.bitrate) or 0
 					if type == "high" then
 						-- highest bitrates with aac > wma > mp3 for tied bitrates
 						if bitrateA != bitrateB then
-							return bitrateA < bitrateB
+							return bitrateA > bitrateB
 						else
 							return a.type == "aac" or (a.type == "wma" and b.type == "mp3")
 						end
@@ -729,19 +722,18 @@ function _sinkMSParser(self, playback, data, decode)
 						if a.type != b.type then
 							return a.type == "wma"
 						else
-							return bitrateA < bitrateB
+							return bitrateA > bitrateB
 						end
 					else
 						-- aac > mp3 first, otherwise by bitrate
 						if a.type != b.type then
 							return a.type == "aac" or (a.type == "mp3" and b.type != "aac")
 						else
-							return bitrateA < bitrateB
+							return bitrateA > bitrateB
 						end
 					end
 				end
 			)
-			
 			local found
 			for _, entry in ipairs(streams) do
 				if entry.protocol == "rtmp" then
@@ -923,7 +915,7 @@ function _playstreamRTMP(self, playback, data, decode, entry)
 		subscribe  = live and entry["identifier"] or nil
 		tcurl      = "rtmp://" .. entry["server"] .. ":1935/" .. appl .. "?_fcs_vhost=" .. entry["server"] .. "&" .. entry["authString"]
 		app        = appl .. "?_fcs_vhost=" .. entry["server"] .. "&" .. entry["authString"]
-		codec      = entry.type == "acc" and "a" or "m"
+		codec      = entry.type == "aac" and "a" or "m"
 
 	elseif entry.kind == "limelight" then
 
@@ -1015,10 +1007,6 @@ function _playstream(self, playback, data, decode, host, port, codec, outputthre
 									 
 									 playback.slimproto:send({ opcode = "META", data = "type=" .. mime.b64(type) .. "&" })
 									 
-									 if data.livetxt then
-										 self:_livetxt(data.livetxt, playback, bitrate, data.spdrver)
-									 end
-
 									 if data.radiovis then
 										 self:_radioVis(data.radiovis, playback, bitrate, data.spdrver)
 									 end
@@ -1028,121 +1016,6 @@ function _playstream(self, playback, data, decode, host, port, codec, outputthre
 								 end
 							 end
 	 ):addTask()
-end
-
-
-local livetxtsock
-
-function _livetxt(self, node, playback, bitrate, spdrver)
-	log:info("opening live text connection for: ", node)
-
-	-- make sure we only have one connection to the server open at one time
-	if livetxtsock then
-		livetxtsock:t_removeRead()
-		livetxtsock:close()
-		livetxtsock = nil
-	end
-
-	local ip = "push.bbc.co.uk"
-	local port = 5222
-	local username = ""
-	for i = 0, 20 do
-		username = username .. math.random(10)
-	end
-
-	local request =
-		"<stream:stream to='push.bbc.co.uk' xml:lang='en' xmlns='jabber:client' xmlns:stream='http://etherx.jabber.org/streams'>" ..
-		"<iq id='auth' type='set' xmlns='jabber:client'><query xmlns='jabber:iq:auth'><password />" .. "<username>" .. username .. "</username><resource>pubsub</resource></query></iq>" ..
-		"<iq id='sub' to='pubsub.push.bbc.co.uk' type='set' xmlns='jabber:client' from='" .. username .. "@push.bbc.co.uk/pubsub'>" .. "<pubsub xmlns='http://jabber.org/protocol/pubsub'><subscribe jid='" .. username .. "@push.bbc.co.uk/pubsub' node='" .. node .. "' /></pubsub></iq>"
-
-	log:info("livetxt connect to: ", ip, " port: ", port)
-
-	local sock = SocketTcp(jnt, ip, port, "BBClivetxt")
-
-	sock:t_connect()
-
-	livetxtsock = sock
-
-	sock:t_addWrite(function(err)
-						log:debug("sending livetxt request: ", request)
-						if (err) then
-							log:warn(err)
-							return
-						end
-						sock.t_sock:send(request)
-						sock:t_removeWrite()
-					end,
-					10)
-
-	local curstream = playback.stream
-
-	local capture, captext = false, ""
-	local p = lxp.new({
-		StartElement = function (parser, name, attr)
-			if name == "text" then
-				capture = true
-			end
-		end,
-		CharacterData = function (parser, text)
-			if capture then
-				captext = captext .. text
-			end
-		end,
-		EndElement = function()
-			if capture then
-				local delay = self:_currentDelay(bitrate) 
-				log:info("text: ", captext, ", delay ", delay)
-				local track, artist = string.match(captext, "Now playing: (.-) by (.-)%.")
-				if track == nil or artist == nil then
-					track, artist = nil, captext
-				end
-				-- send the meta after delay to sync with audio - verify same stream is playing first
-				Timer(1000 * delay,
-					function()
-						if playback.stream == curstream then
-							if spdrver == nil then
-								log:info("sending now artist: ", track, " album: ", artist)
-								playback.slimproto:send({ opcode = "META", data = "artist=" .. mime.b64(track) .. "&album=" .. 
-													  (mime.b64(artist) or "") .. "&" })
-							else
-								log:info("sending now title: ", track, " artist: ", artist)
-								playback.slimproto:send({ opcode = "META", 
-														  data = (track and ("title=" .. mime.b64(track)) or "") .. 
-														  (artist and ("&artist=" .. mime.b64(artist)) or "") .. "&" })
-							end
-						end
-					end,
-					true
-				):start()
-				capture, captext = false, ""
-			end
-		end,
-	})
-
-	sock:t_addRead(function()
-					   if playback.stream == nil or playback.stream ~= curstream then
-						   log:info("stream changed killing livetxt")
-						   if sock == livetxtsock then
-							   livetxtsock = nil
-						   end
-						   sock:t_removeRead()
-						   sock:close()
-						   return
-					   end
-					   local chunk, err, partial = sock.t_sock:receive(4096)
-					   local xml = chunk or partial
-					   if err and err ~= "timeout" then
-						   log:error(err)
-						   sock:t_removeRead()
-					   end
-					   log:debug("read livetxt: ", xml)
-					   p:parse(xml)
-				   end, 
-				   0)
-
-	-- reset counters used to calculate bitrate
-	self.streamBytesOffset = 0
-	self.streamElapsedOffset = 0
 end
 
 
@@ -1170,7 +1043,7 @@ function _radioVis(self, path, playback, bitrate, spdrver)
 
 	local subscribe =
 		"SUBSCRIBE\n" ..
-		"destination: /topic/" .. path .. "/image\n" ..
+		"destination: /topic/" .. path .. "\n" ..
 		"\n" ..
 		string.char(0x00)
 
@@ -1205,6 +1078,7 @@ function _radioVis(self, path, playback, bitrate, spdrver)
 				if sock == stompsock then
 					stompsock = nil
 				end
+				self:_closeSlideshow(curstream)
 				sock:t_removeRead()
 				sock:close()
 				return
@@ -1215,6 +1089,7 @@ function _radioVis(self, path, playback, bitrate, spdrver)
 				if sock == stompsock then
 					stompsock = nil
 				end
+				self:_closeSlideshow(curstream)
 				sock:t_removeRead()
 				sock:close()
 				return
@@ -1239,15 +1114,19 @@ function _radioVis(self, path, playback, bitrate, spdrver)
 				elseif state == "connected" and string.match(frame, "^MESSAGE") then
 					local show, text = string.match(frame, "SHOW (.*)"), string.match(frame, "TEXT (.*)")
 					local trigger = string.match(frame, "trigger%-time:(.-)%c")
-					local delay = string.match(trigger, "NOW") and 0 or nil
-					if (text or show) and delay then
+					local delay = 0
+					if trigger and not string.match(trigger, "NOW") then
+						-- FIXME this is not yet supported as bbc server does not appear to generate
+						log:warn("trigger-time ignored: ", trigger)
+					end
+					if text or show then
 						-- send the meta after delay to sync with audio - verify same stream is playing first
 						Timer(1000 * (self:_currentDelay(bitrate) - delay),
 							  function()
 								  if playback.stream == curstream then
 									  if show then
 										  log:info("show: ", show)
-										  self:_slideshow(show)
+										  self:_slideshow(curstream, show)
 									  end
 									  if text then
 										  log:info("text: ", text)
@@ -1306,7 +1185,10 @@ function _currentDelay(self, bitrate)
 end
 
 
-function _slideshow(self, slideurl)
+function _slideshow(self, curstream, slideurl)
+	-- stash the stream which is maintaining this window so we can close if active stream changes to non slideshow stream
+	self.ssstream = curstream
+
 	-- update existing slideshow window if already showing
 	if Framework:isCurrentWindow(self.sswindow) then
 		local cached = self.artworkCache:get(slideurl)
@@ -1355,6 +1237,18 @@ function _slideshow(self, slideurl)
 	manager:screensaverWindow(self.sswindow, _, _, _, "BBCRadioSlideShow")
 
 	self.sswindow:show(Window.transitionFadeIn)
+end
+
+
+function _closeSlideshow(self, curstream)
+	-- close the slideshow window if the stream which initated it is the one which has ended
+	if self.ssstream == curstream then
+		log:info("close bbcradio slideshow")
+		self.sswindow:hide(function() end) -- null transition for closing window
+		self.sswindow = nil
+		self.ssbg = nil
+		self.ssicon = nil
+	end
 end
 
 
