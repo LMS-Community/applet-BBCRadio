@@ -748,7 +748,10 @@ end
 function _sinkASXParser(self, playback, data, decode)
 	local streams = {}
 	local capture
-	local p = lxp.new({
+	local ver
+
+	-- ASX 3 parser
+	local p3 = lxp.new({
 		StartElement = function (parser, name, attr)
 			if name == "ref" and attr.href then
 				streams[#streams+1] = attr.href
@@ -756,10 +759,21 @@ function _sinkASXParser(self, playback, data, decode)
 		end,
 	})
 
+	-- ASX 2 parser
+	local p2= function(chunk)
+				  for line in string.gmatch(chunk, "(.-)%c") do
+					  for id, url in string.gmatch(line, "Ref(%d+)=(.*)") do
+						  streams[#streams+1] = url
+					  end
+				  end
+			  end
+
 	return function(content)
 		if content == nil then
-			p:parse()
-			p:close()
+			if ver == 3 then
+				p3:parse()
+				p3:close()
+			end
 			if streams[1] then
 				self:_playstreamWMA(playback, data, decode, streams[1])
 			else
@@ -767,7 +781,20 @@ function _sinkASXParser(self, playback, data, decode)
 			end
 			return
 		else
-			p:parse(content)
+			if ver == nil then
+				if string.match(content:upper(), "^<ASX") then
+					log:info("parsing asx ver 3")
+					ver = 3
+				elseif string.match(content:upper(), "^%[REFERENCE%]") then
+					log:info("parsing asx ver 2")
+					ver = 2
+				end
+			end
+			if ver == 3 then
+				p3:parse(content)
+			elseif ver == 2 then
+				p2(content)
+			end
 		end
 	end
 end
