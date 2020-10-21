@@ -2,6 +2,8 @@
 -- BBCRadio Meta - see main applet file for details
 
 local oo            = require("loop.simple")
+local os            = require("os")
+local io            = require("io")
 local mime          = require("mime")
 
 local System        = require("jive.System")
@@ -72,6 +74,16 @@ function registerApplet(self)
 
 	Playback:registerHandler('bbcmsparser',  function(...) appletManager:callService("bbcparser", "ms", ...)  end)
 	Playback:registerHandler('bbcplsparser', function(...) appletManager:callService("bbcparser", "pls", ...) end)
+
+	-- patch rtmp binary included in firmware as it does not support latest rtmp server version
+	local patchfile = "/usr/share/jive/applets/BBCRadio/rtmp.so-" .. System:getMachine()
+	local newbinary = io.open(patchfile, "r")
+	if newbinary then
+		log:info("installing modified rtmp.so")
+		newbinary:close()
+		os.execute("mv " .. patchfile .. " /usr/lib/lua/5.1/rtmp.so")
+		os.execute("chmod 755 /usr/lib/lua/5.1/rtmp.so")
+	end
 end
 
 
