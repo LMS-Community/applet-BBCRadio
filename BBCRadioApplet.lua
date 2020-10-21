@@ -612,11 +612,10 @@ function _playstreamRTMP(self, playback, data, decode, entry)
 
 	elseif string.match(entry["service"], "live") then
 
-		streamname = entry["identifier"] .. "?auth=" .. entry["authString"] .. "&aifp=v001"
-		subscribe  = entry["identifier"] .. "?auth=" .. entry["authString"] .. "&aifp=v001"
-		tcurl      = "rtmp://" .. entry["server"] .. ":80/live?_fcs_vhost=" .. entry["server"] .. "&auth=" .. entry["authString"] ..
-			"&aifp=v001&slist=" .. entry["identifier"]
-		app        = "live?_fcs_vhost=" .. entry["server"] .. "&auth=" .. entry["authString"] .. "&aifp=v001&slist=" .. entry["identifier"]
+		streamname = entry["identifier"] .. "?" .. entry["authString"] .. "&aifp=v001"
+		subscribe  = entry["identifier"]
+		tcurl      = "rtmp://" .. entry["server"] .. ":1935/live?_fcs_vhost=" .. entry["server"] .. "&" .. entry["authString"]
+		app        = "live?_fcs_vhost=" .. entry["server"] .. "&" .. entry["authString"]
 		codec      = "a"
 
 	elseif string.match(entry["service"], "stream_aac_rtmp_concrete") then
