@@ -25,12 +25,16 @@ local SocketTcp        = require("jive.net.SocketTcp")
 
 local Framework        = require("jive.ui.Framework")
 local Window           = require("jive.ui.Window")
+local Surface          = require("jive.ui.Surface")
 local SimpleMenu       = require("jive.ui.SimpleMenu")
 local Icon             = require("jive.ui.Icon")
 local Choice           = require("jive.ui.Choice")
 local Task             = require("jive.ui.Task")
 local Timer            = require("jive.ui.Timer")
 local Player           = require("jive.slim.Player")
+
+local System           = require("jive.System")
+local ArtworkCache     = require("jive.slim.ArtworkCache")
 
 local socketurl        = require("socket.url")
 local dns              = require("jive.net.DNS")
@@ -40,6 +44,8 @@ local hasDecode, decode= pcall(require, "squeezeplay.decode")
 local appletManager    = appletManager
 local jiveMain         = jiveMain
 local jnt              = jnt
+
+local FRAMERATE        = jive.ui.FRAME_RATE
 
 local JIVE_VERSION     = jive.JIVE_VERSION
 
@@ -55,8 +61,10 @@ local img_templ     = "http://node1.bbcimg.co.uk/iplayer/images/episode/%s_512_2
 local lt_prefix     = "pubsub.livetext."
 
 local live = {
-	{ text = "BBC Radio 1",       id = "bbc_radio_one",       pls = "r1",  img1 = "radio1_logomobile1-1.png",   lt = "radio1" },
-	{ text = "BBC Radio 1 Xtra",  id = "bbc_1xtra",           pls = "r1x", img1 = "radio1x_logomobile1-1.png",  lt = "1xtra"  },
+	{ text = "BBC Radio 1",       id = "bbc_radio_one",       pls = "r1",  img1 = "radio1_logomobile1-1.png",   
+	  lt = "radio1", vis = "fm/ce1/c201/09880" },
+	{ text = "BBC Radio 1 Xtra",  id = "bbc_1xtra",           pls = "r1x", img1 = "radio1x_logomobile1-1.png",  
+	  lt = "1xtra",  vis = "dab/ce1/ce15/c22a/0"  },
 	{ text = "BBC Radio 2",       id = "bbc_radio_two",       pls = "r2",  img1 = "radio2_logomobile1-1.png",   lt = "radio2" },
 	{ text = "BBC Radio 3",       id = "bbc_radio_three",     pls = "r3",  img1 = "radio3_logomobile1-1.png",   lt = "radio3" },
 	{ text = "BBC Radio 4 FM",    id = "bbc_radio_fourfm",    pls = "r4",  img1 = "radio4_logomobile1-1.png",   lt = "radio4" },
@@ -176,6 +184,8 @@ function menu(self, menuItem)
 			local window = Window("text_list", menuItem.text)
 			local menu   = SimpleMenu("menu")
 			local usepls = self:getSettings()["streamtype"] == "mp3aac" or self:getSettings()["streamtype"] == "high"
+			local sshow  = self:getSettings()["livedisp"] == "slideshow"
+			local livet  = self:getSettings()["livedisp"] == "livetxt"
 			for _, entry in pairs(live) do
 				local img = entry.img1 and (img1_prefix .. entry.img1) or (entry.img2 and (img2_prefix .. entry.img2))
 				local icon
@@ -183,12 +193,19 @@ function menu(self, menuItem)
 					icon = Icon("icon")
 					self.server:fetchArtwork(img, icon, jiveMain:getSkinParam('THUMB_SIZE'), 'png')
 				end
-				local playable = { title = entry.text, img = img, livetxt = entry.lt and ( lt_prefix .. entry.lt ) or nil, 
+				local playable = { title = entry.text, img = img, 
+								   livetxt = (entry.lt and not entry.vis and ( lt_prefix .. entry.lt )) or nil,
+								   radiovis = entry.vis,
 								   parser = entry.parser, self = self }
 				if entry.pls and usepls then
 					playable.pls = string.format(livepls_templ, entry.pls)
 				else
 					playable.url = entry.url or (live_prefix .. entry.id)
+				end
+				if sshow and entry.vis then
+					playable.radiovis = entry.vis
+				elseif (show or livet) and entry.lt then
+					playable.livetxt = lt_previx .. entry.lt
 				end
 				menu:addItem({
 					text = entry.text,
@@ -267,7 +284,7 @@ function menu(self, menuItem)
 	local mapto   = { "high", "wma", "mp3aac" }
 	local mapfrom = { high = 1, wma = 2, mp3aac = 3 }
 	menu:addItem({
-		text  = "Prefer:",
+		text  = "Stream:",
 		style = 'item_choice',
 		check = Choice("choice", 
 					   { "Highest Bitrate", "WMA", "AAC/MP3" },
@@ -276,6 +293,22 @@ function menu(self, menuItem)
 						   self:storeSettings()
 					   end,
 					   mapfrom[self:getSettings()["streamtype"]]
+		)
+	})
+
+	-- preference setting for live display (live text or slide show)
+	local mapto   = { "none", "livetxt", "slideshow" }
+	local mapfrom = { none = 1, livetxt = 2, slideshow = 3 }
+	menu:addItem({
+		text  = "Live Display:",
+		style = 'item_choice',
+		check = Choice("choice", 
+					   { "None", "Live Text", "Slide Show" },
+					   function(object, isSelected)
+						   self:getSettings()["livedisp"] = mapto[isSelected]
+						   self:storeSettings()
+					   end,
+					   mapfrom[self:getSettings()["livedisp"]]
 		)
 	})
 
@@ -585,6 +618,9 @@ _menuAction = function(event, item, stream)
 	if stream.livetxt then
 		url = url .. "&livetxt=" .. mime.b64(stream.livetxt)
 	end
+	if stream.radiovis then
+		url = url .. "&radiovis=" .. mime.b64(stream.radiovis)
+	end
 
 	log:info("sending ", action, " request to ", server, " player ", player, " url ", url)
 
@@ -616,6 +652,12 @@ function bbcparser(self, type, playback, data, decode)
 	if data.livetxt then
 		data.livetxt = mime.unb64("", data.livetxt)
 		log:info("livetxt: ", data.livetxt)
+	end
+
+	data.radiovis = string.match(cmdstr, "radiovis%=(.-)%&")
+	if data.radiovis then
+		data.radiovis = mime.unb64("", data.radiovis)
+		log:info("radiovis: ", data.radiovis)
 	end
 
 	data.spdrver = string.match(cmdstr,"ver%=(.-)%&")
@@ -982,6 +1024,10 @@ function _playstream(self, playback, data, decode, host, port, codec, outputthre
 										 self:_livetxt(data.livetxt, playback, bitrate, data.spdrver)
 									 end
 
+									 if data.radiovis then
+										 self:_radioVis(data.radiovis, playback, bitrate, data.spdrver)
+									 end
+
 								 else
 									 log:warn("bad dns lookup for ", entry["server"])
 								 end
@@ -1026,7 +1072,7 @@ function _livetxt(self, node, playback, bitrate, spdrver)
 						log:debug("sending livetxt request: ", request)
 						if (err) then
 							log:warn(err)
-							return _handleDisconnect(self, err)
+							return
 						end
 						sock.t_sock:send(request)
 						sock:t_removeWrite()
@@ -1105,6 +1151,137 @@ function _livetxt(self, node, playback, bitrate, spdrver)
 end
 
 
+local stompsock
+
+function _radioVis(self, path, playback, bitrate, spdrver)
+	log:info("opening radioVis stomp connection for: ", path)
+
+	-- make sure we only have one connection to the server open at one time
+	if stompsock then
+		stompsock:t_removeRead()
+		stompsock:close()
+		stompsock = nil
+	end
+
+	local ip = "radiovis.external.bbc.co.uk"
+	local port = 61613
+
+	local connect = 
+		"CONNECT\n" ..
+		"accept-version: 1.0\n" ..
+		"host: radiovis.external.bbc.co.uk\n" ..
+		"\n" ..
+		string.char(0x00)
+
+	local subscribe =
+		"SUBSCRIBE\n" ..
+		"destination: /topic/" .. path .. "/image\n" ..
+		"\n" ..
+		string.char(0x00)
+
+	log:info("radioVis stomp connect to: ", ip, " port: ", port, " path: ", path)
+
+	local sock = SocketTcp(jnt, ip, port, "BBCradioVis")
+
+	sock:t_connect()
+
+	stompsock = sock
+
+	sock:t_addWrite(function(err)
+						if (err) then
+							log:warn(err)
+							return
+						end
+						log:debug("sending stomp connect")
+						sock.t_sock:send(connect)
+						sock:t_removeWrite()
+					end,
+					10)
+
+	local curstream = playback.stream
+
+	local state = "connect"
+	local buf = ""
+
+	sock:t_addRead(
+		function()
+			if playback.stream == nil or playback.stream ~= curstream then
+				log:info("stream changed killing stomp connection")
+				if sock == stompsock then
+					stompsock = nil
+				end
+				sock:t_removeRead()
+				sock:close()
+				return
+			end
+			local chunk, err, partial = sock.t_sock:receive(4096)
+			if err and err ~= "timeout" then
+				log:error(err)
+				if sock == stompsock then
+					stompsock = nil
+				end
+				sock:t_removeRead()
+				sock:close()
+				return
+			end
+			buf = buf .. (chunk or partial)
+			
+			-- find frame
+			-- FIXME - ignores content length and assumes no 0x00 characters in body
+			local frame
+			for i = 1, string.len(buf) do
+				if string.byte(buf, i) == 0 and string.byte(buf, i+1) == 10 then
+					frame = string.sub(buf, 1, i - 1)
+					buf = string.sub(buf, i + 2)
+					break
+				end
+			end
+
+			if frame then
+				if state == "connect" and string.match(frame, "^CONNECTED") then
+					sock.t_sock:send(subscribe)
+					state = "connected"
+				elseif state == "connected" and string.match(frame, "^MESSAGE") then
+					local show, text = string.match(frame, "SHOW (.*)"), string.match(frame, "TEXT (.*)")
+					local trigger = string.match(frame, "trigger%-time:(.-)%c")
+					local delay = string.match(trigger, "NOW") and 0 or nil
+					if (text or show) and delay then
+						-- send the meta after delay to sync with audio - verify same stream is playing first
+						Timer(1000 * (self:_currentDelay(bitrate) - delay),
+							  function()
+								  if playback.stream == curstream then
+									  if show then
+										  log:info("show: ", show)
+										  self:_slideshow(show)
+									  end
+									  if text then
+										  log:info("text: ", text)
+										  if spdrver == nil then
+											  playback.slimproto:send({ opcode = "META",
+																		data = (text and ("&album=" .. mime.b64(text)) or "") .. "&" })
+										  else
+											  playback.slimproto:send({ opcode = "META",
+																		data = (text and ("&artist=" .. mime.b64(text)) or "") .. "&" })
+										  end
+									  end
+								  end
+							  end,
+							  true
+						  ):start()
+					end
+				else
+					log:warn("ignoring: ", frame)
+				end
+			end
+		end, 
+		0)
+	
+	-- reset counters used to calculate bitrate
+	self.streamBytesOffset = 0
+	self.streamElapsedOffset = 0
+end
+
+
 function _currentDelay(self, bitrate)
 	local status = decode:status()
 	-- calulate the actual bit rate over time so we can determine delay for the decode buffer
@@ -1131,4 +1308,100 @@ function _currentDelay(self, bitrate)
 
 	log:info("delay: ", delay, " (decode: ", decodeD, " output: ", outputD, ") rate: ", rate)
 	return delay
+end
+
+
+function _slideshow(self, slideurl)
+	-- update existing slideshow window if already showing
+	if Framework:isCurrentWindow(self.sswindow) then
+		local cached = self.artworkCache:get(slideurl)
+		if cached then
+			log:info("image cached: ", slideurl)
+			self:_showImage(Surface:loadImageData(cached, #cached))
+		else
+			log:info("fetch update: ", slideurl)
+			local req = RequestHttp(_sinkScreensaver(self, slideurl), 'GET', slideurl, { headers = self.ssheaders})
+			local uri = req:getURI()
+			local http = SocketHttp(jnt, uri.host, uri.port, uri.host)
+			http:fetch(req)
+		end
+		return
+	end
+
+	-- check if now playing is showing, open slideshow on top of this if it is...
+	local nowPlaying = appletManager:getAppletInstance("NowPlaying")
+	if not Framework:isCurrentWindow(nowPlaying.window) then
+ 		return
+	end
+
+	log:info("open bbcradio slideshow")
+	self.sswindow = Window("text_list")
+
+	self.artworkCache = ArtworkCache()
+
+	self.sw, self.sh = Framework:getScreenSize()
+	-- FIXME - does the BBC support these headers?
+	self.ssheaders = { ['Display-Width'] = self.sw, ['Display-Height'] = self.sh }
+	
+	log:info("fetch: ", slideurl)
+	local req = RequestHttp(_sinkScreensaver(self, slideurl), 'GET', slideurl, { headers = self.ssheaders })
+	local uri = req:getURI()
+	local http = SocketHttp(jnt, uri.host, uri.port, uri.host)
+	http:fetch(req)
+
+	self.ssbg = Surface:newRGBA(self.sw, self.sh)
+	self.ssbg:filledRectangle(0, 0, self.sw, self.sh, 0x000000FF)
+	self.ssicon = Icon("icon", self.ssbg)
+	
+	self.sswindow:addWidget(self.ssicon)
+	self.sswindow:setShowFrameworkWidgets(false)
+
+	local manager = appletManager:getAppletInstance("ScreenSavers")
+	manager:screensaverWindow(self.sswindow, _, _, _, "BBCRadioSlideShow")
+
+	self.sswindow:show(Window.transitionFadeIn)
+end
+
+
+function _sinkScreensaver(self, url)
+	return function(chunk, err)
+			   if err then
+				   log:warn(err)
+			   end
+			   if chunk then
+				   self.artworkCache:set(url, chunk)
+				   self:_showImage(Surface:loadImageData(chunk, #chunk))
+			   end
+		   end
+end
+
+
+function _showImage(self, image)
+	local w, h = image:getSize()
+	local offset = 0
+	if w ~= self.sw and h ~= self.sh then
+		local tmp = image:rotozoom(0, (self.sh+1) / h, 1)
+		image:release()
+		image = tmp
+		local wnew, hnew = image:getSize()
+		offset = (self.sw - wnew) / 2
+	end
+	local alpha = 0
+	local update = System:getMachine() == 'baby' and FRAME_RATE / 2 or FRAME_RATE 
+	local step  = 128 / update
+	if self.ssanimate then
+		self.ssicon:removeAnimation(self.ssanimate)
+	end
+	self.ssanimate = self.ssicon:addAnimation(
+		function() 
+			alpha = alpha + step
+			alpha = alpha > 255 and 255 or alpha
+			image:blitAlpha(self.ssbg, offset, 0, alpha)
+			if alpha >= 255 then
+				self.ssicon:removeAnimation(self.ssanimate)
+				self.ssanimate = nil
+			end
+			self.ssicon:reDraw()
+		end,
+		update)
 end

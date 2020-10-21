@@ -37,6 +37,9 @@ function upgradeSettings(self, settings)
 	if settings.streamtype == nil then
 		settings.streamtype = System:getMachine() == 'baby' and "wma" or "high"
 	end
+	if settings.livetxt == nil then
+		settings.livetxt = "slideshow"
+	end
 	return settings
 end
 
@@ -60,10 +63,11 @@ function registerApplet(self)
 
 	self.menu = self:menuItem('appletBBCRadio', 'radios', 'BBC Radio', 
 							  function(applet, ...) applet:menu(...) end, 0, { icon = icon }, "hm_radio")
+
 	self.icon = icon
 
 	jiveMain:addItem(self.menu)
-	
+
 	self:registerService("bbcparser")
 
 	Playback:registerHandler('bbcmsparser',  function(...) appletManager:callService("bbcparser", "ms", ...)  end)
