@@ -49,7 +49,7 @@ function registerApplet(self)
 						 icon.checkSkin = cs
 					 end
 
-	self.menu = self:menuItem('appletBBCRadio', 'hidden', 'BBC Radio', 
+	self.menu = self:menuItem('appletBBCRadio', 'radios', 'BBC Radio', 
 							  function(applet, ...) applet:menu(...) end, 0, { icon = icon }, "hm_radio")
 	self.icon = icon
 
@@ -62,6 +62,7 @@ function registerApplet(self)
 end
 
 
+-- add to myapps menu
 function notify_playerLoaded(self, player)
 	if player and player == Player:getLocalPlayer() then
 		log:debug("local player loaded - adding to menu")
@@ -75,23 +76,7 @@ function notify_playerLoaded(self, player)
 			menus:_addItem(self.menu)
 			-- update to our custom icon
 			self.menu.icon = self.icon
-		else
-			-- legacy - is this used?
-			log:debug("local player selected - adding to menu radios")
-			jiveMain:addItemToNode(self.menu, 'radios')
 		end
 	end
 end
 
-
-function notify_playerChanged(self, player)
-	if player and player != Player:getLocalPlayer() then
-		log:debug("local player not selected - removing from menu")
-		local menus = appletManager:getAppletInstance("SlimMenus")
-		if menus._addMyAppsNode then
-			jiveMain:removeItemFromNode(self.menu, 'myApps')
-		else
-			jiveMain:removeItemFromNode(self.menu, 'radios')
-		end
-	end
-end
