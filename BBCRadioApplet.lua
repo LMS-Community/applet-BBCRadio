@@ -621,7 +621,6 @@ function _playstreamRTMP(self, playback, data, decode, entry)
 
 	elseif string.match(entry["service"], "stream_aac_rtmp_concrete") then
 
-		-- decode entities on authString?
 		streamname = entry["identifier"] .. "?" .. entry["authString"]
 		tcurl      = "rtmp://" .. entry["server"] .. ":1935/" .. entry["application"]
 		app        = entry["application"]
@@ -629,7 +628,6 @@ function _playstreamRTMP(self, playback, data, decode, entry)
 
 	elseif string.match(entry["service"], "stream_aac_ws_concrete") then
 		
-		-- decode entities on authString?
 		local play = string.gsub(entry["identifier"], "mp4:", "", 1)
 		streamname = entry["identifier"] .. "?" .. entry["authString"]
 		tcurl      = "rtmp://" .. entry["server"] .. ":1935/ondemand?_fcs_vhost=" .. entry["server"] .. "&auth=" .. entry["authString"] ..
@@ -741,6 +739,8 @@ function _livetxt(self, node, playback)
 					end,
 					10)
 
+	local curstream = playback.stream
+
 	local capture, captext = false, ""
 	local p = lxp.new({
 		StartElement = function (parser, name, attr)
@@ -762,10 +762,9 @@ function _livetxt(self, node, playback)
 					track, artist = captext, ""
 				end
 				-- send the meta after delay to sync with audio - verify same stream is playing first
-				local stream = playback.stream
 				Timer(1000 * delay,
 					function()
-						if playback.stream == stream then										
+						if playback.stream == curstream then										
 							log:info("sending now artist: ", track, " album: ", artist)
 							playback.slimproto:send({ opcode = "META", data = "artist=" .. mime.b64(track) .. "&album=" .. 
 												  (mime.b64(artist) or "") .. "&" })
@@ -778,10 +777,8 @@ function _livetxt(self, node, playback)
 		end,
 	})
 
-	local stream = playback.stream
-
 	sock:t_addRead(function()
-					   if playback.stream == nil or playback.stream ~= stream then
+					   if playback.stream == nil or playback.stream ~= curstream then
 						   log:info("stream changed killing livetxt")
 						   if sock == livetxtsock then
 							   livetxtsock = nil
