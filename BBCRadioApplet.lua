@@ -140,6 +140,8 @@ local function str2timeZ(timestr)
 end
 
 
+local _menuAction
+
 function menu(self, menuItem)
 	local window = Window("text_list", menuItem.text)
 	local menu   = SimpleMenu("menu")
@@ -154,25 +156,20 @@ function menu(self, menuItem)
 			for _, entry in pairs(live) do
 				menu:addItem({
 					text = entry.text,
-					isPlayableItem = 1,
+					isPlayableItem = { url = live_prefix .. entry.id, title = entry.text, img = img_prefix .. entry.img, 
+									   livetxt = entry.lt and ( lt_prefix .. entry.lt ) or nil, self = self },
 					style = 'item_choice',
-					callback = function()
-						self:_play({ url = live_prefix .. entry.id, title = entry.text, img = img_prefix .. entry.img, 
-									 livetxt = entry.lt and ( lt_prefix .. entry.lt ) or nil
-								 })
-						appletManager:callService('goNowPlaying', Window.transitionPushLeft, false)
-					end,
+					callback = _menuAction,
+					cmCallback = _menuAction,
 				})
 			end
 			for _, entry in pairs(localradio) do
 				menu:addItem({
 					text = entry.text,
-					isPlayableItem = 1,
+					isPlayableItem = { url = live_prefix .. entry.id, title = entry.text, self = self },
 					style = 'item_choice',
-					callback = function()
-						self:_play({ url = live_prefix .. entry.id, title = entry.text })
-						appletManager:callService('goNowPlaying', Window.transitionPushLeft, false)
-					end,
+					callback = _menuAction,
+					cmCallback = _menuAction,
 				})
 			end
 			window:addWidget(menu)
@@ -282,13 +279,9 @@ function _sinkXMLParser(self, prevmenu, title, service)
 				local daystr  = os.date("%A", bcast)
 				local timestr = string.format("%02d:%02d ", date.hour, date.min)
 
-				-- shared table and closure for menus
-				local playt  = { url = entry.link, title = title, desc = entry.synopsis, 
-								 img = string.format(img_templ, entry.pid), dur = entry.dur }
-				local playcb = function()
-								   self:_play(playt)
-								   appletManager:callService('goNowPlaying', Window.transitionPushLeft, false)
-							   end
+				-- shared table for menus
+				local playt = { url = entry.link, title = title, desc = entry.synopsis, 
+								img = string.format(img_templ, entry.pid), dur = entry.dur, self = self }
 
 				-- by day menus
 				local daymenu
@@ -316,9 +309,10 @@ function _sinkXMLParser(self, prevmenu, title, service)
 				end
 				daymenu:addItem({
 					text = timestr .. title,
-					isPlayableItem = 1,
+					isPlayableItem = playt,
 					style = 'item_choice',
-					callback = playcb,
+					callback = _menuAction,
+					cmCallback = _menuAction,
 				})
 
 				-- by brand menus
@@ -349,9 +343,10 @@ function _sinkXMLParser(self, prevmenu, title, service)
 				end
 				brandmenu:addItem({
 					text = timestr .. daystr,
-					isPlayableItem = 1,
+					isPlayableItem = playt,
 					style = 'item_choice',
-					callback = playcb,
+					callback = _menuAction,
+					cmCallback = _menuAction,									
 				})
 			end
 		end
@@ -371,7 +366,20 @@ function _sinkXMLParser(self, prevmenu, title, service)
 end
 
 
-function _play(self, stream)
+_menuAction = function(event, item)
+	local action = event:getType() == ACTION and event:getAction() or event:getType() == EVENT_ACTION and "play"
+	local stream = item.isPlayableItem
+
+	if not stream or not stream.self then
+		log:warn("bad event - no stream info")
+		return
+	end
+	if action ~= "play" and action ~= "add" then
+		log:warn("bad action - ", action)
+		return
+	end
+
+	local self = stream.self
 	local player = Player:getLocalPlayer()
 	local server = player and player:getSlimServer()
 
@@ -388,8 +396,14 @@ function _play(self, stream)
 	if stream.livetxt then
 		url = url .. "&livetxt=" .. mime.b64(stream.livetxt)
 	end
-	log:info("sending request to ", server, " player ", player, " url ", url)
-	server:userRequest(nil,	player:getId(), { "playlist", "play", url, stream.title })
+
+	log:info("sending ", action, " request to ", server, " player ", player, " url ", url)
+
+	server:userRequest(nil,	player:getId(), { "playlist", action, url, stream.title })
+
+	if action == "play" then
+		appletManager:callService('goNowPlaying', Window.transitionPushLeft, false)
+	end
 end
 
 
@@ -785,7 +799,7 @@ end
 function _currentDelay(self)
 	local status = decode:status()
 	-- calulate the actual bit rate over time so we can determine delay for the decode buffer
-	-- (there is an inital surge so ignore the measurement for 60 seconds)
+	-- (there is an inital surge so ignore the measurement for 5 seconds)
 	local bytes   = status.bytesReceivedL + (status.bytesReceivedH * 0xFFFFFFFF) - self.streamBytesOffset
 	local elapsed = status.elapsed / 1000 - self.streamElapsedOffset
 	local rate
