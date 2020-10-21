@@ -14,6 +14,7 @@ local debug            = require("jive.utils.debug")
 
 local mime             = require("mime")
 local lxp              = require("lxp")
+local lom              = require("lxp.lom")
 local os               = require("os")
 
 local Applet           = require("jive.Applet")
@@ -132,6 +133,8 @@ local localradio = {
 	{ text = "BBC York",          id = "bbc_radio_york"      },
 }
 
+local specialevents = { text = "Special Events", url = "http://xdevtriodeplugins.2.xpdev-hosted.com/specialevents.opml" }
+
 local tzoffset
 
 function setTzOffset()
@@ -218,6 +221,19 @@ function menu(self, menuItem)
 			end,
 		})
 	end
+
+	-- special events menu from remote opml feed
+	menu:addItem({
+		text = specialevents.text,
+		sound = "WINDOWSHOW",
+		callback = function(_, menuItem)
+			log:info("fetching: ", specialevents.url)
+			local req = RequestHttp(self:_sinkOPMLParser(menu, menuItem.text), 'GET', specialevents.url, { stream = true })
+			local uri = req:getURI()
+			local http = SocketHttp(jnt, uri.host, uri.port, uri.host)
+			http:fetch(req)
+		end
+	})
 
 	menu:addItem({
 		text  = "Streams:",
@@ -378,9 +394,112 @@ function _sinkXMLParser(self, prevmenu, title, service)
 end
 
 
-_menuAction = function(event, item)
+function _sinkOPMLParser(self, prevmenu, title)
+	local window = Window("text_list", title)
+	local menu   = SimpleMenu("menu")
+	window:addWidget(menu)
+	prevmenu:lock()
+
+	local menus = { menu }
+
+	local p = lxp.new({
+		StartElement = function (parser, name, attr)
+			if name == 'outline' and attr.text then
+				if attr.URL and attr.type and (attr.type == 'audio' or attr.type == 'playlist') then
+					-- playable item, possibly with parser
+					menus[#menus]:addItem({
+						text = attr.text,
+						isPlayableItem = { url = attr.URL, title = attr.text, self = self, parser = attr.parser },
+						style = 'item_choice',
+						callback = _menuAction,
+						cmCallback = _menuAction,									
+					})
+				elseif attr.URL then
+					log:warn("no support for opml links")
+				else
+					-- add a menu level for the outline
+					local mywindow = Window("text_list", attr.text)
+					local mymenu   = SimpleMenu("menu")
+					mywindow:addWidget(mymenu)
+					menus[#menus]:addItem({
+						text = attr.text,
+						sound = "WINDOWSHOW",
+						weight = 10,
+						callback = function(_, menuItem)
+							self:tieAndShowWindow(mywindow)
+						end
+					})
+					menus[#menus+1] = mymenu
+				end
+			end
+		end,
+		EndElement = function (parser, name)
+			if name == 'outline' then
+				-- pop back menu level
+				menus[#menu] = nil
+			end
+		end
+	})
+
+	return function(chunk)
+		if chunk == nil then
+			p:parse()
+			p:close()
+			prevmenu:unlock()
+			self:tieAndShowWindow(window)
+			return
+		else
+			p:parse(chunk)
+		end
+	end
+end
+
+
+function _playlistParse(url, event, stream)
+	stream.parser = nil
+	log:info("fetching: ", url)
+	local req = RequestHttp(
+		function(chunk)
+			if chunk then
+				local xml = lom.parse(chunk)
+				local connection
+				for _, entry in ipairs(xml) do
+					if type(entry) == 'table' and entry.tag then
+						if entry.tag == 'summary' then
+							stream.desc = entry[1]
+						elseif entry.tag == 'link' and entry.attr.type and string.match(entry.attr.type, "image") then
+							stream.img = entry.attr.href
+						elseif entry.tag == 'item' then
+							for _, m in ipairs(entry) do
+								if type(m) == 'table' and m.tag == 'media' then
+									for _, c in ipairs(m) do
+										if type(c) == 'table' and c.tag == 'connection' then
+											connection = c.attr
+											break
+										end
+									end
+								end
+							end
+						end
+					end
+				end
+				if connection then
+					stream.url = "http://www.bbc.co.uk/mediaselector/4/gtis/?server=" .. connection.server ..
+						"&identifier=" .. connection.identifier
+					_menuAction(event, item, stream)
+				end
+			end
+		end
+		, 'GET', url)
+	local uri = req:getURI()
+	local http = SocketHttp(jnt, uri.host, uri.port, uri.host)
+	http:fetch(req)
+end
+
+
+_menuAction = function(event, item, stream)
 	local action = event:getType() == ACTION and event:getAction() or event:getType() == EVENT_ACTION and "play"
-	local stream = item.isPlayableItem
+	local stream = stream or item.isPlayableItem
 
 	if not stream or not stream.self then
 		log:warn("bad event - no stream info")
@@ -388,6 +507,11 @@ _menuAction = function(event, item)
 	end
 	if action ~= "play" and action ~= "add" then
 		log:warn("bad action - ", action)
+		return
+	end
+
+	if stream.parser and string.match(stream.parser, "BBCPlaylistParser") then
+		_playlistParse(stream.url, event, stream)
 		return
 	end
 
@@ -441,7 +565,7 @@ function bbcmsparser(self, playback, data, decode)
 		log:info("livetxt: ", data.livetxt)
 	end
 	
-	local req = RequestHttp(_sinkMSParser(self, playback, data, decode), 'GET', url, {})
+	local req = RequestHttp(_sinkMSParser(self, playback, data, decode), 'GET', url)
 	local uri = req:getURI()
 	local http = SocketHttp(jnt, uri.host, uri.port, uri.host)
 	http:fetch(req)
@@ -451,14 +575,25 @@ end
 -- sink to parse mediaselector xml
 function _sinkMSParser(self, playback, data, decode)
 	local services = {}
-	local service
+	local service, streammode, streamtag
 	local p = lxp.new({
 		StartElement = function (parser, name, attr)
 			if name == "media" and attr.service then
 				service = attr.service
+				services[service] = { bitrate = attr.bitrate, encoding = attr.encoding }
 			elseif name == "connection" and service then
-				services[service] = attr
+				for _, key in ipairs(attr) do
+					services[service][key] = attr[key]
+				end
+			elseif name == "stream" then
+				streammode = true
+				services["stream"] = {}
+			elseif streammode then
+				streamtag = name
 			end
+		end,
+		CharacterData = function (parser, text)
+			services["stream"][streamtag] = (services["stream"][streamtag] or "") .. text
 		end,
 	})
 
@@ -474,12 +609,12 @@ function _sinkMSParser(self, playback, data, decode)
 					break
 				end
 			end
-			if string.match(entry["service"], "stream_aac") or string.match(entry["service"], "stream_mp3") then
+			if string.match(entry["service"], "stream_aac") or string.match(entry["service"], "stream_mp3") or entry["service"] == 'stream' then
 				log:info("rtmp: ", entry["service"])
 				self:_playstreamRTMP(playback, data, decode, entry)
 			elseif string.match(entry["service"], "stream_wma") then
 				log:info("asx: ", entry["href"])
-				local req = RequestHttp(_sinkASXParser(self, playback, data, decode), 'GET', entry["href"], {})
+				local req = RequestHttp(_sinkASXParser(self, playback, data, decode, entry["bitrate"]), 'GET', entry["href"], {})
 				local uri = req:getURI()
 				local http = SocketHttp(jnt, uri.host, uri.port, uri.host)
 				http:fetch(req)
@@ -512,7 +647,8 @@ function _preferredServices(self)
 		'iplayer_intl_stream_wma_live',
 		'iplayer_intl_stream_wma_ws',
 		'iplayer_intl_stream_wma_uk_concrete',
-		'iplayer_intl_stream_wma_lo_concrete'
+		'iplayer_intl_stream_wma_lo_concrete',
+		'stream'                                 -- used for single stream ms responses
 	}
 	local i = self:getSettings()["usewma"] and 10 or 0
 	return function()
@@ -567,7 +703,7 @@ local GUID = _makeGUID()
 
 
 -- play a WMA stream
-function _playstreamWMA(self, playback, data, decode, stream)
+function _playstreamWMA(self, playback, data, decode, stream, bitrate)
 	log:info("playing: ", stream)
 
 	-- following is taken from SBS...
@@ -594,7 +730,7 @@ function _playstreamWMA(self, playback, data, decode, stream)
 		"Pragma: stream-switch-entry=ffff:1:0\r\n" ..
 		"\r\n"
 
-	self:_playstream(playback, data, decode, url.host, url.port or 80, 'w', 10, string.byte(1), 1)
+	self:_playstream(playback, data, decode, url.host, url.port or 80, 'w', 10, string.byte(1), 1, bitrate)
 end
 
 
@@ -632,6 +768,14 @@ function _playstreamRTMP(self, playback, data, decode, entry)
 		app        = "ondemand?_fcs_vhost=" .. entry["server"] .. "&" .. entry["authString"]
 		codec      = "a"
 
+	elseif entry["service"] == "stream" then
+
+		streamname = entry["identifier"] .. "?" .. entry["token"]
+		subscribe  = entry["application"] == 'live' and entry["identifier"] or nil
+		tcurl      = "rtmp://" .. entry["server"] .. ":1935/" .. entry["application"] .. "?_fcs_vhost=" .. entry["server"] .. "&" .. entry["token"]
+		app        = entry["application"] .. "?_fcs_vhost=" .. entry["server"] .. "&" .. entry["token"]
+		codec      = "a"
+
 	end
 
 	playback.header = "streamname=" .. mime.b64(streamname) .. "&tcurl=" .. mime.b64(tcurl) .. "&app=" .. mime.b64(app) .. 
@@ -649,12 +793,13 @@ function _playstreamRTMP(self, playback, data, decode, entry)
 					 codec,                                    -- codec id
 					 codec == "a" and 0 or 1,                  -- outputthresh
 					 codec == "a" and string.byte('2') or nil, -- samplesize
-					 nil)                                      -- samplerate
+					 nil,                                      -- samplerate
+					 entry["bitrate"])                         -- bitrate
 end
 
 
 -- find the ip address, setup the decoder and start playback - done in a task to allow dns to work
-function _playstream(self, playback, data, decode, host, port, codec, outputthresh, samplesize, samplerate)
+function _playstream(self, playback, data, decode, host, port, codec, outputthresh, samplesize, samplerate, bitrate)
 
 	Task("playstream", self, function()
 								 local ip = dns:toip(host)
@@ -697,10 +842,15 @@ function _playstream(self, playback, data, decode, host, port, codec, outputthre
 									 elseif codec == 'w' then type = 'wma'
 									 end
 									 
+									 if bitrate then
+										 log:info("bitrate: ", bitrate)
+										 type = bitrate .. "k " .. type
+									 end
+									 
 									 playback.slimproto:send({ opcode = "META", data = "type=" .. mime.b64(type) .. "&" })
 									 
 									 if data.livetxt then
-										 self:_livetxt(data.livetxt, playback)
+										 self:_livetxt(data.livetxt, playback, bitrate)
 									 end
 
 								 else
@@ -713,7 +863,7 @@ end
 
 local livetxtsock
 
-function _livetxt(self, node, playback)
+function _livetxt(self, node, playback, bitrate)
 	log:info("opening live text connection for: ", node)
 
 	-- make sure we only have one connection to the server open at one time
@@ -770,7 +920,7 @@ function _livetxt(self, node, playback)
 		end,
 		EndElement = function()
 			if capture then
-				local delay = self:_currentDelay() 
+				local delay = self:_currentDelay(bitrate) 
 				log:info("text: ", captext, ", delay ", delay)
 				local track, artist = string.match(captext, "Now playing: (.-) by (.-)%.")
 				if track == nil or artist == nil then
@@ -819,14 +969,17 @@ function _livetxt(self, node, playback)
 end
 
 
-function _currentDelay(self)
+function _currentDelay(self, bitrate)
 	local status = decode:status()
 	-- calulate the actual bit rate over time so we can determine delay for the decode buffer
 	-- (there is an inital surge so ignore the measurement for 5 seconds)
 	local bytes   = status.bytesReceivedL + (status.bytesReceivedH * 0xFFFFFFFF) - self.streamBytesOffset
 	local elapsed = status.elapsed / 1000 - self.streamElapsedOffset
 	local rate
-	if self.streamBytesOffset == 0 then
+
+	if bitrate then
+		rate = bitrate * 1000
+	elseif self.streamBytesOffset == 0 then
 		if elapsed > 5 then
 			self.streamBytesOffset = bytes
 			self.streamElapsedOffset = elapsed
