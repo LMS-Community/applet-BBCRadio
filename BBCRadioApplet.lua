@@ -27,10 +27,13 @@ local Window           = require("jive.ui.Window")
 local SimpleMenu       = require("jive.ui.SimpleMenu")
 local Checkbox         = require("jive.ui.Checkbox")
 local Task             = require("jive.ui.Task")
+local Timer            = require("jive.ui.Timer")
 local Player           = require("jive.slim.Player")
 
 local socketurl        = require("socket.url")
 local dns              = require("jive.net.DNS")
+
+local hasDecode, decode= pcall(require, "squeezeplay.decode")
 
 local appletManager    = appletManager
 local jnt              = jnt
@@ -392,7 +395,7 @@ function _sinkMSParser(self, playback, data, decode)
 			p:parse()
 			p:close()
 			local entry
-			for s in self:preferredServices() do
+			for s in self:_preferredServices() do
 				if services[s] then
 					entry = services[s]
 					entry["service"] = s
@@ -420,7 +423,7 @@ end
 
 
 -- return itterator of preferred service names
-function preferredServices(self)
+function _preferredServices(self)
 	local order = {
 		'iplayer_uk_stream_aac_rtmp_live',      -- start here if not usewma
 		'iplayer_uk_stream_aac_rtmp_concrete',
@@ -476,7 +479,7 @@ end
 
 
 -- WMA GUID creation
-function makeGUID()
+function _makeGUID()
 	local guid = ""
 	for d = 0, 31 do
 		if d == 8 or d == 12 or d == 16 or d == 20 then
@@ -487,7 +490,7 @@ function makeGUID()
 	return guid
 end
 
-local GUID = makeGUID()
+local GUID = _makeGUID()
 
 
 -- play a WMA stream
@@ -633,6 +636,7 @@ function _livetxt(self, node, playback)
 	if livetxtsock then
 		livetxtsock:t_removeRead()
 		livetxtsock:close()
+		livetxtsock = nil
 	end
 
 	local ip = "push.bbc.co.uk"
@@ -680,14 +684,24 @@ function _livetxt(self, node, playback)
 		end,
 		EndElement = function()
 			if capture then
-				log:debug(captext)
+				local delay = self:_currentDelay() 
+				log:info("text: ", captext, ", delay ", delay)
 				local track, artist = string.match(captext, "Now playing: (.-) by (.-)%.")
 				if track == nil or artist == nil then
 					track, artist = captext, ""
 				end
-				playback.slimproto:send({ opcode = "META", 
-										  data = "artist=" .. mime.b64(track) .. "&album=" .. (mime.b64(artist) or "") .. "&" 
-									  })
+				-- send the meta after delay to sync with audio - verify same stream is playing first
+				local stream = playback.stream
+				Timer(1000 * delay,
+					function()
+						if playback.stream == stream then										
+							log:info("sending now artist: ", track, " album: ", artist)
+							playback.slimproto:send({ opcode = "META", data = "artist=" .. mime.b64(track) .. "&album=" .. 
+												  (mime.b64(artist) or "") .. "&" })
+						end
+					end,
+					true
+				):start()
 				capture, captext = false, ""
 			end
 		end,
@@ -698,6 +712,9 @@ function _livetxt(self, node, playback)
 	sock:t_addRead(function()
 					   if playback.stream == nil or playback.stream ~= stream then
 						   log:info("stream changed killing livetxt")
+						   if sock == livetxtsock then
+							   livetxtsock = nil
+						   end
 						   sock:t_removeRead()
 						   sock:close()
 						   return
@@ -711,5 +728,35 @@ function _livetxt(self, node, playback)
 					   log:debug("read livetxt: ", xml)
 					   p:parse(xml)
 				   end, 
-				   60)
+				   0)
+
+	-- reset counters used to calculate bitrate
+	self.streamBytesOffset = 0
+	self.streamElapsedOffset = 0
+end
+
+
+function _currentDelay(self)
+	local status = decode:status()
+	-- calulate the actual bit rate over time so we can determine delay for the decode buffer
+	-- (there is an inital surge so ignore the measurement for 60 seconds)
+	local bytes   = status.bytesReceivedL + (status.bytesReceivedH * 0xFFFFFFFF) - self.streamBytesOffset
+	local elapsed = status.elapsed / 1000 - self.streamElapsedOffset
+	local rate
+	if self.streamBytesOffset == 0 then
+		if elapsed > 5 then
+			self.streamBytesOffset = bytes
+			self.streamElapsedOffset = elapsed
+		end
+		rate = 128000
+	else
+		rate = 8 * bytes / elapsed
+	end
+
+	local outputD = status.outputFull / (44100 * 8) -- output buffer delay in secs
+	local decodeD = status.decodeFull / (rate  / 8) -- decode buffer delay in secs
+	local delay   = outputD + decodeD
+
+	log:info("delay: ", delay, " (decode: ", decodeD, " output: ", outputD, ") rate: ", rate)
+	return delay
 end

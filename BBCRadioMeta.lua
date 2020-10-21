@@ -13,6 +13,8 @@ local Player        = require("jive.slim.Player")
 local appletManager = appletManager
 local jiveMain      = jiveMain
 
+local jnt           = jnt
+
 local icon_url = "http://www.mysqueezebox.com/static/images/icons/bbc.png"
 
 module(...)
@@ -31,6 +33,8 @@ end
 
 
 function registerApplet(self)
+	jnt:subscribe(self)
+
 	local icon = Icon("icon")
 	-- use the checkSkin function to load the icon image on first call
 	local cs = icon.checkSkin
@@ -45,11 +49,22 @@ function registerApplet(self)
 						 icon.checkSkin = cs
 					 end
 
-	local menu = self:menuItem('appletBBCRadio', 'radios', 'BBC Radio', 
+	self.menu = self:menuItem('appletBBCRadio', 'hidden', 'BBC Radio', 
 							   function(applet, ...) applet:menu(...) end, 0, { icon = icon }, "hm_radio")
-	jiveMain:addItem(menu)
+	jiveMain:addItem(self.menu)
 					 
 	self:registerService("bbcmsparser")
 
 	Playback:registerHandler('bbcmsparser', function(...) appletManager:callService("bbcmsparser", ...) end)
+end
+
+
+function notify_playerCurrent(self, player)
+	if player and player == Player:getLocalPlayer() then
+		log:debug("local player selected - adding to menu")
+		jiveMain:addItemToNode(self.menu, 'radios')
+	else
+		log:debug("local player not selected - removing from meny")
+		jiveMain:removeItemFromNode(self.menu, 'radios')
+	end
 end
