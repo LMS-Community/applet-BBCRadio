@@ -51,8 +51,10 @@ function registerApplet(self)
 
 	self.menu = self:menuItem('appletBBCRadio', 'hidden', 'BBC Radio', 
 							  function(applet, ...) applet:menu(...) end, 0, { icon = icon }, "hm_radio")
+	self.icon = icon
+
 	jiveMain:addItem(self.menu)
-					 
+	
 	self:registerService("bbcparser")
 
 	Playback:registerHandler('bbcmsparser',  function(...) appletManager:callService("bbcparser", "ms", ...)  end)
@@ -60,19 +62,30 @@ function registerApplet(self)
 end
 
 
-function notify_playerCurrent(self, player)
+function notify_playerLoaded(self, player)
 	if player and player == Player:getLocalPlayer() then
-		log:debug("local player selected - adding to menu")
+		log:debug("local player loaded - adding to menu")
 		local menus = appletManager:getAppletInstance("SlimMenus")
 		if menus._addMyAppsNode then
+			log:debug("local player selected - adding to menu myApps")
 			if not menus.myAppsNode then
 				menus:_addMyAppsNode()
 			end
-			jiveMain:addItemToNode(self.menu, 'myApps')
+			self.menu.node = 'myApps'
+			menus:_addItem(self.menu)
+			-- update to our custom icon
+			self.menu.icon = self.icon
 		else
+			-- legacy - is this used?
+			log:debug("local player selected - adding to menu radios")
 			jiveMain:addItemToNode(self.menu, 'radios')
 		end
-	else
+	end
+end
+
+
+function notify_playerChanged(self, player)
+	if player and player != Player:getLocalPlayer() then
 		log:debug("local player not selected - removing from menu")
 		local menus = appletManager:getAppletInstance("SlimMenus")
 		if menus._addMyAppsNode then

@@ -3,7 +3,7 @@
 -- Allows Squeezeplay players connected to MySqueezebox.com to play BBC Radio streams without requring
 -- a local server and server plugin
 --
--- Copyright (c) 2010, 2011 Adrian Smith, (Triode) triode1@btinternet.com
+-- Copyright (c) 2010 - 2012 Adrian Smith, (Triode) triode1@btinternet.com
 --
 -- Released under the BSD license for use with the Logitech Squeezeplay application
 
