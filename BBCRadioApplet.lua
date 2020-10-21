@@ -7,7 +7,7 @@
 --
 -- Released under the BSD license for use with the Logitech Squeezeplay application
 
-local next, pairs, ipairs, type, package, string, tostring, pcall, math = next, pairs, ipairs, type, package, string, tostring, pcall, math
+local next, pairs, ipairs, type, package, string, tostring, pcall, math, table = next, pairs, ipairs, type, package, string, tostring, pcall, math, table
 
 local oo               = require("loop.simple")
 local debug            = require("jive.utils.debug")
@@ -59,8 +59,6 @@ local live = {
 	{ text = "BBC Radio 1 Xtra",  id = "bbc_1xtra",           pls = "r1x", img1 = "radio1x_logomobile1-1.png",  lt = "1xtra"  },
 	{ text = "BBC Radio 2",       id = "bbc_radio_two",       pls = "r2",  img1 = "radio2_logomobile1-1.png",   lt = "radio2" },
 	{ text = "BBC Radio 3",       id = "bbc_radio_three",     pls = "r3",  img1 = "radio3_logomobile1-1.png",   lt = "radio3" },
-	{ text = "BBC Radio 3 HD",    url= "http://www.bbc.co.uk/radio3/r3_xhq.xml", parser = "BBCPlaylistParser", 
-	  img1 = "radio3_logomobile1-1.png", lt = "radio3"  },
 	{ text = "BBC Radio 4 FM",    id = "bbc_radio_fourfm",    pls = "r4",  img1 = "radio4_logomobile1-1.png",   lt = "radio4" },
 	{ text = "BBC Radio 4 LW",    id = "bbc_radio_fourlw",    pls = "r4lw",img1 = "radio4_logomobile1-1.png"                  },
 	{ text = "BBC Radio 4 Extra", id = "bbc_radio_four_extra",pls = "r4x", img1 = "radio4x_logomobile1-1.png",  lt = "bbc7"   },
@@ -69,11 +67,11 @@ local live = {
 	{ text = "BBC Radio 6 Music", id = "bbc_6music",          pls = "r6",  img1 = "radio6_logomobile1-1.png",   lt = "6music" },
 	{ text = "BBC Asian Network", id = "bbc_asian_network",   pls = "ran", img1 = "radioan_logomobile1-1.png",  lt = "asiannetwork" },
 	{ text = "BBC World Service", id = "bbc_world_service",   img2 = "radio/bbc_world_service.gif",             lt = "worldservice" },
-	{ text = "BBC Radio Scotland",id = "bbc_radio_scotland",  img2 = "radio/bbc_radio_scotland_1.gif",          lt = "radioscotland" },
+	{ text = "BBC Radio Scotland",id = "bbc_radio_scotland_fm",img2 = "radio/bbc_radio_scotland_1.gif",         lt = "radioscotland" },
 	{ text = "BBC Radio nan Gaidheal", id = "bbc_radio_nan_gaidheal", img2 = "radio/bbc_radio_nan_gaidheal.gif"       },
 	{ text = "BBC Radio Ulster",  id = "bbc_radio_ulster",    img2 = "radio/bbc_radio_ulster.gif"                     },
 	{ text = "BBC Radio Foyle",   id = "bbc_radio_foyle",     img2 = "station_logos/bbc_radio_foyle.png"              },
-	{ text = "BBC Radio Wales",   id = "bbc_radio_wales",     img2 = "radio/bbc_radio_wales.gif"                      },
+	{ text = "BBC Radio Wales",   id = "bbc_radio_wales_fm",  img2 = "radio/bbc_radio_wales.gif"                      },
 	{ text = "BBC Radio Cymru",   id = "bbc_radio_cymru",     img2 = "radio/bbc_radio_cymru.gif"                      },
 }
 
@@ -177,7 +175,7 @@ function menu(self, menuItem)
 		callback = function(_, menuItem)
 			local window = Window("text_list", menuItem.text)
 			local menu   = SimpleMenu("menu")
-			local usewma = self:getSettings()["usewma"]
+			local usepls = self:getSettings()["streamtype"] == "mp3aac" or self:getSettings()["streamtype"] == "high"
 			for _, entry in pairs(live) do
 				local img = entry.img1 and (img1_prefix .. entry.img1) or (entry.img2 and (img2_prefix .. entry.img2))
 				local icon
@@ -187,7 +185,7 @@ function menu(self, menuItem)
 				end
 				local playable = { title = entry.text, img = img, livetxt = entry.lt and ( lt_prefix .. entry.lt ) or nil, 
 								   parser = entry.parser, self = self }
-				if entry.pls and not usewma then
+				if entry.pls and usepls then
 					playable.pls = string.format(livepls_templ, entry.pls)
 				else
 					playable.url = entry.url or (live_prefix .. entry.id)
@@ -265,16 +263,19 @@ function menu(self, menuItem)
 		end
 	})
 
+	-- preference setting for streamtype
+	local mapto   = { "high", "wma", "mp3aac" }
+	local mapfrom = { high = 1, wma = 2, mp3aac = 3 }
 	menu:addItem({
-		text  = "Streams:",
+		text  = "Prefer:",
 		style = 'item_choice',
 		check = Choice("choice", 
-					   { "WMA", "AAC/MP3" },
+					   { "Highest Bitrate", "WMA", "AAC/MP3" },
 					   function(object, isSelected)
-						   self:getSettings()["usewma"] = (isSelected == 1)
+						   self:getSettings()["streamtype"] = mapto[isSelected]
 						   self:storeSettings()
 					   end,
-					   self:getSettings()["usewma"] and 1 or 2
+					   mapfrom[self:getSettings()["streamtype"]]
 		)
 	})
 
@@ -640,26 +641,32 @@ end
 
 -- sink to parse mediaselector xml
 function _sinkMSParser(self, playback, data, decode)
-	local services = {}
-	local service, streammode, streamtag
+	local streams = {}
+	local media, streammode, streamtag
 	local p = lxp.new({
 		StartElement = function (parser, name, attr)
-			if name == "media" and attr.service then
-				service = attr.service
-				services[service] = { bitrate = attr.bitrate, encoding = attr.encoding }
-			elseif name == "connection" and service then
-				for _, key in ipairs(attr) do
-					services[service][key] = attr[key]
+			if name == "media" and attr.type then
+				local type = ((attr.type ==  "audio/wma" or attr.type == "audio/x-ms-asf") and "wma") or
+				(attr.type == "audio/mp4" and "aac") or (attr.type == "audio/mpeg" and "mp3")
+				media = { bitrate = attr.bitrate, encoding = attr.encoding, service = attr.service, type = type }
+			elseif name == "connection" and media then
+				local connection = {}
+				for key, val in pairs(media) do
+					connection[key] = val
 				end
+				for _, key in ipairs(attr) do
+					connection[key] = attr[key]
+				end
+				streams[#streams+1] = connection
 			elseif name == "stream" then
 				streammode = true
-				services["stream"] = {}
+				streams[1] = { service = "stream", protocol = "rtmp", type = "acc" }
 			elseif streammode then
 				streamtag = name
 			end
 		end,
 		CharacterData = function (parser, text)
-			services["stream"][streamtag] = (services["stream"][streamtag] or "") .. text
+			streams[1][streamtag] = (streams[1][streamtag] or "") .. text
 		end,
 	})
 
@@ -667,25 +674,56 @@ function _sinkMSParser(self, playback, data, decode)
 		if content == nil then
 			p:parse()
 			p:close()
-			local entry
-			for s in self:_preferredServices() do
-				if services[s] then
-					entry = services[s]
-					entry["service"] = s
+			-- sort streams by bitrate and preference
+			local type = self:getSettings()["streamtype"]
+			table.sort(streams, 
+				function(a, b)
+					local bitrateA = a.bitrate or 0
+					local bitrateB = b.bitrate or 0
+					if type == "high" then
+						-- highest bitrates with aac > wma > mp3 for tied bitrates
+						if bitrateA != bitrateB then
+							return bitrateA < bitrateB
+						else
+							return a.type == "aac" or (a.type == "wma" and b.type == "mp3")
+						end
+					elseif type == "wma" then
+						-- wma first, otherwise by bitrate
+						if a.type != b.type then
+							return a.type == "wma"
+						else
+							return bitrateA < bitrateB
+						end
+					else
+						-- aac > mp3 first, otherwise by bitrate
+						if a.type != b.type then
+							return a.type == "aac" or (a.type == "mp3" and b.type != "aac")
+						else
+							return bitrateA < bitrateB
+						end
+					end
+				end
+			)
+			
+			local found
+			for _, entry in ipairs(streams) do
+				if entry.protocol == "rtmp" then
+					log:info("rtmp: ", entry["service"])
+					self:_playstreamRTMP(playback, data, decode, entry)
+					found = true
+					break
+				elseif entry.protocol == "http" and entry.type == "wma" and entry.href then
+					log:info("asx: ", entry.href)
+					local req = RequestHttp(_sinkASXParser(self, playback, data, decode, entry.bitrate), 'GET', entry.href, {})
+					local uri = req:getURI()
+					local http = SocketHttp(jnt, uri.host, uri.port, uri.host)
+					http:fetch(req)
+					found = true
 					break
 				end
 			end
-			if string.match(entry["service"], "stream_aac") or string.match(entry["service"], "stream_mp3") or entry["service"] == 'stream' then
-				log:info("rtmp: ", entry["service"])
-				self:_playstreamRTMP(playback, data, decode, entry)
-			elseif string.match(entry["service"], "stream_wma") then
-				log:info("asx: ", entry["href"])
-				local req = RequestHttp(_sinkASXParser(self, playback, data, decode, entry["bitrate"]), 'GET', entry["href"], {})
-				local uri = req:getURI()
-				local http = SocketHttp(jnt, uri.host, uri.port, uri.host)
-				http:fetch(req)
-			else
-				log:info("did not find a playable stream")
+			if not found then
+				log:info("could not find playable stream")
 			end
 			return
 		else
@@ -696,13 +734,13 @@ end
 
 
 -- sink to parse mediaselector xml
-function _sinkPLSParser(self, playback, data, decode)
+function _sinkPLSParser(self, playback, data, decode, bitrate)
 	local streams = {}
 	return function(content)
 		if content == nil then
 			if streams[1] then
 				-- assume stream in pls file is aac for the moment
-				self:_playstreamAAC(playback, data, decode, streams[1])
+				self:_playstreamAAC(playback, data, decode, streams[1], bitrate)
 			else
 				log:warn("no stream found")
 			end
@@ -715,37 +753,8 @@ function _sinkPLSParser(self, playback, data, decode)
 end
 
 
--- return itterator of preferred service names
-function _preferredServices(self)
-	local order = {
-		'iplayer_uk_stream_aac_rtmp_hi_live',    -- start here if not usewma
-		'iplayer_uk_stream_aac_rtmp_live',
-		'iplayer_uk_stream_aac_rtmp_concrete',
-		'iplayer_intl_stream_aac_rtmp_live',
-		'iplayer_intl_stream_aac_rtmp_concrete',
-		'iplayer_intl_stream_aac_rtmp_ws_live',
-		'iplayer_intl_stream_aac_ws_concrete',
-		'iplayer_uk_stream_mp3',
-		'iplayer_intl_stream_mp3',
-		'iplayer_intl_stream_mp3_lo',
-		'iplayer_uk_stream_wma',                 -- start here if usewma
-		'iplayer_intl_stream_wma',
-		'iplayer_intl_stream_wma_live',
-		'iplayer_intl_stream_wma_ws',
-		'iplayer_intl_stream_wma_uk_concrete',
-		'iplayer_intl_stream_wma_lo_concrete',
-		'stream'                                 -- used for single stream ms responses
-	}
-	local i = self:getSettings()["usewma"] and 10 or 0
-	return function()
-			   i = i + 1
-			   return order[i]
-		   end
-end
-
-
 -- sink to parse asx - currently extracts first stream
-function _sinkASXParser(self, playback, data, decode)
+function _sinkASXParser(self, playback, data, decode, bitrate)
 	local streams = {}
 	local capture
 	local ver
@@ -775,7 +784,7 @@ function _sinkASXParser(self, playback, data, decode)
 				p3:close()
 			end
 			if streams[1] then
-				self:_playstreamWMA(playback, data, decode, streams[1])
+				self:_playstreamWMA(playback, data, decode, streams[1], bitrate)
 			else
 				log:info("no media url found")
 			end
@@ -868,43 +877,34 @@ function _playstreamRTMP(self, playback, data, decode, entry)
 
 	local streamname, tcurl, app, subscribe, codec
 
-	if string.match(entry["service"], "stream_mp3") then
+	if entry.kind == "akamai" and entry["service"] != "stream" then
 
-		streamname = entry["identifier"] .. "?" .. entry["authString"]
-		tcurl      = "rtmp://" .. entry["server"] .. ":1935/ondemand?_fcs_vhost=" .. entry["server"] .. "&" .. entry["authString"]
-		app        = "ondemand?_fcs_vhost=" .. entry["server"] .. "&" .. entry["authString"]
-		codec      = "m"
+		local live = entry["application"] and entry["application"] == "live"
+		local appl = entry["application"] or "ondemand"
+		
+		streamname = entry["identifier"] .. "?" .. entry["authString"] .. (live and "&aifp=v001" or "")
+		subscribe  = live and entry["identifier"] or nil
+		tcurl      = "rtmp://" .. entry["server"] .. ":1935/" .. appl .. "?_fcs_vhost=" .. entry["server"] .. "&" .. entry["authString"]
+		app        = appl .. "?_fcs_vhost=" .. entry["server"] .. "&" .. entry["authString"]
+		codec      = entry.type == "acc" and "a" or "m"
 
-	elseif string.match(entry["service"], "live") then
-
-		streamname = entry["identifier"] .. "?" .. entry["authString"] .. "&aifp=v001"
-		subscribe  = entry["identifier"]
-		tcurl      = "rtmp://" .. entry["server"] .. ":1935/live?_fcs_vhost=" .. entry["server"] .. "&" .. entry["authString"]
-		app        = "live?_fcs_vhost=" .. entry["server"] .. "&" .. entry["authString"]
-		codec      = "a"
-
-	elseif string.match(entry["service"], "stream_aac_rtmp_concrete") then
+	elseif entry.kind == "limelight" then
 
 		streamname = entry["identifier"]
 		tcurl      = "rtmp://" .. entry["server"] .. ":1935/" .. entry["application"] .. "?" .. entry["authString"]
 		app        = entry["application"] .. "?" .. entry["authString"]
 		codec      = "a"
 
-	elseif string.match(entry["service"], "stream_aac_ws_concrete") then
+	elseif entry.kind == "akamai" and entry["service"] == "stream" then
 		
-		streamname = entry["identifier"] .. "?" .. entry["authString"]
-		tcurl      = "rtmp://" .. entry["server"] .. ":1935/ondemand?_fcs_vhost=" .. entry["server"] .. "&" .. entry["authString"]
-		app        = "ondemand?_fcs_vhost=" .. entry["server"] .. "&" .. entry["authString"]
-		codec      = "a"
-
-	elseif entry["service"] == "stream" then
-
 		streamname = entry["identifier"] .. "?" .. entry["token"]
 		subscribe  = entry["application"] == 'live' and entry["identifier"] or nil
 		tcurl      = "rtmp://" .. entry["server"] .. ":1935/" .. entry["application"] .. "?_fcs_vhost=" .. entry["server"] .. "&" .. entry["token"]
 		app        = entry["application"] .. "?_fcs_vhost=" .. entry["server"] .. "&" .. entry["token"]
 		codec      = "a"
 
+	else
+		log:warn("rtmp stream not playable")
 	end
 
 	playback.header = "streamname=" .. mime.b64(streamname) .. "&tcurl=" .. mime.b64(tcurl) .. "&app=" .. mime.b64(app) .. 

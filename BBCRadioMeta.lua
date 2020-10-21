@@ -27,8 +27,17 @@ end
 
 
 function defaultSettings(self)
-	local lowend = System:getMachine() == 'baby' and true or false
-	return { usewma = lowend }
+	return {
+		streamtype = System:getMachine() == 'baby' and "wma" or "high"
+	}
+end
+
+
+function upgradeSettings(self, settings)
+	if settings.streamtype == nil then
+		settings.streamtype = System:getMachine() == 'baby' and "wma" or "high"
+	end
+	return settings
 end
 
 
