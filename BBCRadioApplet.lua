@@ -55,6 +55,8 @@ local live = {
 	{ text = "BBC Radio 1Xtra",   id = "bbc_1xtra",         img = "radio/bbc_radio_two.gif",     lt = "1xtra"   },
 	{ text = "BBC Radio 2",       id = "bbc_radio_two",     img = "radio/bbc_radio_two.gif",     lt = "radio2"  },
 	{ text = "BBC Radio 3",       id = "bbc_radio_three",   img = "radio/bbc_radio_three.gif",   lt = "radio3"  },
+	{ text = "BBC Radio 3 HD",    url= "http://www.bbc.co.uk/radio3/r3_xhq.xml", parser = "BBCPlaylistParser", 
+	  img = "radio/bbc_radio_three.gif", lt = "radio3"  },
 	{ text = "BBC Radio 4 FM",    id = "bbc_radio_fourfm",  img = "radio/bbc_radio_four.gif",    lt = "radio4"  },
 	{ text = "BBC Radio 4 LW",    id = "bbc_radio_fourlw",  img = "radio/bbc_radio_four.gif"                    },
 	{ text = "BBC Radio 5 Live",  id = "bbc_radio_five_live", img = "radio/bbc_radio_five_live.gif", lt = "radio5live" },
@@ -171,8 +173,8 @@ function menu(self, menuItem)
 			for _, entry in pairs(live) do
 				menu:addItem({
 					text = entry.text,
-					isPlayableItem = { url = live_prefix .. entry.id, title = entry.text, img = img_prefix .. entry.img, 
-									   livetxt = entry.lt and ( lt_prefix .. entry.lt ) or nil, self = self },
+					isPlayableItem = { url = entry.url or (live_prefix .. entry.id), title = entry.text, img = img_prefix .. entry.img,
+									   livetxt = entry.lt and ( lt_prefix .. entry.lt ) or nil, parser = entry.parser, self = self },
 					style = 'item_choice',
 					callback = _menuAction,
 					cmCallback = _menuAction,
@@ -486,6 +488,9 @@ function _playlistParse(url, event, stream)
 				if connection then
 					stream.url = "http://www.bbc.co.uk/mediaselector/4/gtis/?server=" .. connection.server ..
 						"&identifier=" .. connection.identifier
+					if connection.application then
+						stream.url = stream.url .. "&application=" .. connection.application
+					end
 					_menuAction(event, item, stream)
 				end
 			end
