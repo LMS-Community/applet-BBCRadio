@@ -603,11 +603,9 @@ function _playstreamRTMP(self, playback, data, decode, entry)
 
 	if string.match(entry["service"], "stream_mp3") then
 
-		local play = string.gsub(entry["identifier"], "mp3:", "", 1)
-		streamname = entry["identifier"] .. "?auth=" .. entry["authString"] .. "&aifp=v001"
-		tcurl      = "rtmp://" .. entry["server"] .. ":80/ondemand?_fcs_vhost=" .. entry["server"] .. "&auth=" .. entry["authString"] ..
-			"&aifp=v001&slist=" .. play
-		app        = "ondemand?_fcs_vhost=" .. entry["server"] .. "&auth=" .. entry["authString"] .. "&aifp=v001&slist=" .. play
+		streamname = entry["identifier"] .. "?" .. entry["authString"]
+		tcurl      = "rtmp://" .. entry["server"] .. ":1935/ondemand?_fcs_vhost=" .. entry["server"] .. "&" .. entry["authString"]
+		app        = "ondemand?_fcs_vhost=" .. entry["server"] .. "&" .. entry["authString"]
 		codec      = "m"
 
 	elseif string.match(entry["service"], "live") then
@@ -620,18 +618,16 @@ function _playstreamRTMP(self, playback, data, decode, entry)
 
 	elseif string.match(entry["service"], "stream_aac_rtmp_concrete") then
 
-		streamname = entry["identifier"] .. "?" .. entry["authString"]
-		tcurl      = "rtmp://" .. entry["server"] .. ":1935/" .. entry["application"]
-		app        = entry["application"]
+		streamname = entry["identifier"]
+		tcurl      = "rtmp://" .. entry["server"] .. ":1935/" .. entry["application"] .. "?" .. entry["authString"]
+		app        = entry["application"] .. "?" .. entry["authString"]
 		codec      = "a"
 
 	elseif string.match(entry["service"], "stream_aac_ws_concrete") then
 		
-		local play = string.gsub(entry["identifier"], "mp4:", "", 1)
 		streamname = entry["identifier"] .. "?" .. entry["authString"]
-		tcurl      = "rtmp://" .. entry["server"] .. ":1935/ondemand?_fcs_vhost=" .. entry["server"] .. "&auth=" .. entry["authString"] ..
-			"&aifp=v001&slist=" .. play
-		app        = "ondemand?_fcs_vhost=" .. entry["server"] .. "&auth=" .. entry["authString"] .. "&aifp=v001&slist=" .. play
+		tcurl      = "rtmp://" .. entry["server"] .. ":1935/ondemand?_fcs_vhost=" .. entry["server"] .. "&" .. entry["authString"]
+		app        = "ondemand?_fcs_vhost=" .. entry["server"] .. "&" .. entry["authString"]
 		codec      = "a"
 
 	end
