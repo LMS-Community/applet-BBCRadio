@@ -40,7 +40,6 @@ local jnt              = jnt
 
 local JIVE_VERSION     = jive.JIVE_VERSION
 
-
 module(..., Framework.constants)
 oo.class(_M, Applet)
 
@@ -661,7 +660,7 @@ function _playstream(self, playback, data, decode, host, port, codec, outputthre
 								 if ip then
 									 log:info("playing stream codec ", codec, " host: ", host, " ip: ", ip, " port: ", port)
 									 local v1, v2, v3, v4 = string.match(JIVE_VERSION, "(%d+)%.(%d+)%.(%d+)%sr(%d+)")
-									 if v1 == 7 and v2 == 5 then
+									 if v1 == '7' and v2 == '5' then
 										 -- 7.5
 										 decode:start(string.byte(codec),
 													  string.byte(data.transitionType),
