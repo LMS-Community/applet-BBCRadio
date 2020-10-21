@@ -86,7 +86,6 @@ local listenagain = {
 	{ text = "BBC Radio 4 Extra", id = "radio4extra.xml",     img1 = "radio4x_logomobile1-1.png"   },
 	{ text = "BBC Radio 5 Live",  id = "fivelive.xml",        img1 = "radio5l_logomobile1-1.png"   },
 	{ text = "BBC Radio 6 Music", id = "6music.xml",          img1 = "radio6_logomobile1-1.png"    },
-	{ text = "BBC Radio 7",       id = "bbc7.xml",            img1 = "radio7_logomobile1-1.png"    },
 	{ text = "BBC Asian Network", id = "asiannetwork.xml",    img1 = "radioan_logomobile1-1.png"   },
 	{ text = "BBC World Service", id = "worldservice.xml",    img2 = "radio/bbc_world_service.gif" },
 	{ text = "BBC Radio Scotland",id = "radioscotland.xml",   img2 = "radio/bbc_radio_scotland_1.gif" },
@@ -339,7 +338,7 @@ function _sinkXMLParser(self, prevmenu, title, service)
 				if daymenus[date.day] then
 					daymenu = daymenus[date.day]
 				else
-					daymenu = SimpleMenu("menu")
+					daymenu = {}
 					daymenus[date.day] = daymenu
 
 					menu:addItem({
@@ -348,23 +347,23 @@ function _sinkXMLParser(self, prevmenu, title, service)
 						weight = pos,
 						callback = function(_, menuItem)
 							local window = Window("text_list", menuItem.text)
-							local oldwindow = daymenu:getWindow()
-							if oldwindow then
-								oldwindow:removeWidget(daymenu)
+							local menu   = SimpleMenu("menu")
+							for _, entry in ipairs(daymenu) do
+								menu:addItem({
+									text = entry.timestr .. entry.t.title,
+									isPlayableItem = entry.t,
+									style = 'item_choice',
+									callback = _menuAction,
+									cmCallback = _menuAction,
+								})
 							end
-							window:addWidget(daymenu)
+							window:addWidget(menu)
 							self:tieAndShowWindow(window)
 						end
 					})
 					pos = pos - 1
 				end
-				daymenu:addItem({
-					text = timestr .. title,
-					isPlayableItem = playt,
-					style = 'item_choice',
-					callback = _menuAction,
-					cmCallback = _menuAction,
-				})
+				daymenu[#daymenu + 1] = { t = playt, timestr = timestr }
 
 				-- by brand menus
 				local brand = entry.brand or entry.series or entry.title
@@ -374,7 +373,7 @@ function _sinkXMLParser(self, prevmenu, title, service)
 				elseif brandmenus[brand] then
 					brandmenu = brandmenus[brand]
 				else
-					brandmenu = SimpleMenu("menu")
+					brandmenu = {}
 					brandmenus[brand] = brandmenu
 
 					menu:addItem({
@@ -383,22 +382,22 @@ function _sinkXMLParser(self, prevmenu, title, service)
 						weight = 10,
 						callback = function(_, menuItem)
 							local window = Window("text_list", menuItem.text)
-							local oldwindow = brandmenu:getWindow()
-							if oldwindow then
-								oldwindow:removeWidget(brandmenu)
+							local menu   = SimpleMenu("menu")
+							for _, entry in ipairs(brandmenu) do
+								menu:addItem({
+									text = entry.text,
+									isPlayableItem = entry.t,
+									style = 'item_choice',
+									callback = _menuAction,
+									cmCallback = _menuAction,
+								})
 							end
-							window:addWidget(brandmenu)
+							window:addWidget(menu)
 							self:tieAndShowWindow(window)
 						end
 					})
 				end
-				brandmenu:addItem({
-					text = timestr .. daystr,
-					isPlayableItem = playt,
-					style = 'item_choice',
-					callback = _menuAction,
-					cmCallback = _menuAction,									
-				})
+				brandmenu[#brandmenu + 1] = { t = playt, text = timestr .. daystr }
 			end
 		end
 	})
