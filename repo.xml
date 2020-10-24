@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<extensions>
+	<details>
+		<title lang="EN">BBCRadio</title>
+	</details>	
+	<applets>
+		<applet name="BBCRadio" version="1.16" minTarget="7.5.0.8430" maxTarget="7.*" target="baby|fab4|squeezeplay">
+			<title lang="EN">BBC Radio</title>
+			<desc lang="EN">Listen to BBC Radio live and listen again streams on your Squeezebox.  Live radio and the last 7 days of BBC national, regional and local radio from the UK.</desc>
+			<creator>Triode</creator>
+			<email>triode1@btinternet.com</email>
+			<url>https://github.com/LMS-Community/applet-BBCRadio/releases/download/v1.16/BBCRadio-v1.16.zip</url>
+			<sha>81888621ae827e3702f32069388ec3ff359af982</sha>
+		</applet>
+	</applets>
+</extensions>
